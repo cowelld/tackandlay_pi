@@ -16,9 +16,10 @@ mkdir tackandlay_pi/build
 cd tackandlay_pi/build
 cmake ..
 cmake --build .
+```
+Note for Windows users: To link the plugin DLL, the library with OpenCPN exports (opencpn.lib) is needed. Either copy it from your OpenCPN build directory, where it is created or, if you don't want to build OpenCPN by yourself at all, get one corresponding to your desired API level from http://sourceforge.net/projects/opencpnplugins/files/opencpn_lib/
 
 If you want to build inside the OpenCPN source tree, which is good for debugging, it is still possible, just make sure you did the above configure (cmake ..) step before and version.h is created in src directory, otherwise you will end up with errors about undefined PLUGIN_VERSION_[MAJOR,MINOR]
-```
 
 ###Build on Mac OS X:
 Tools: Can be installed either manually or from Homebrew (http://brew.sh)

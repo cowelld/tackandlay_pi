@@ -28,15 +28,14 @@
 
 #include "wx/wxprec.h"
 
+#include "version.h"
+
 #ifndef  WX_PRECOMP
   #include "wx/wx.h"
 #endif //precompiled headers
 
-#define     PLUGIN_VERSION_MAJOR    1
-#define     PLUGIN_VERSION_MINOR    0
-
 #define     MY_API_VERSION_MAJOR    1
-#define     MY_API_VERSION_MINOR    8
+#define     MY_API_VERSION_MINOR    11
 
 #ifndef PI
       #define PI        3.1415926535897931160E0      /* pi */
@@ -52,7 +51,7 @@ class TnLDisplayOptionsDialog;
 
 #define TACKANDLAY_TOOL_POSITION    -1          // Request default positioning of toolbar tool
 
-class tackandlay_pi : public opencpn_plugin_18
+class tackandlay_pi : public opencpn_plugin_111
 {
 public:
       tackandlay_pi(void *ppimgr);

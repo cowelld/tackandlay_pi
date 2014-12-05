@@ -28,9 +28,18 @@
   #include "wx/wx.h"
 #endif
 
+ 
+#include "wx/wx.h"
+#include <wx/glcanvas.h>
+#include <wx/notebook.h> 
+#include <wx/textfile.h>
+#include <wx/tokenzr.h>
+#include <wx/wfstream.h> 
+#include <wx/txtstrm.h> 
 #include "nmea0183/nmea0183.h"
 #include <wx/mstream.h>         // for icon
 #include "ocpn_plugin.h"
+#include <math.h>
 
 #include "tackandlay_pi.h"
 using namespace std;
@@ -46,27 +55,46 @@ enum {										// process ID's
         ID_DISPLAYTYPE
 };
 
+//******************************************************************
+//**************** Graphical Entities **********************
 double tnl_overlay_transparency;
 int  tnl_polar_calibration[180][6];		// polar diagram represents 180 derees and 6,8,10,12,16,20 knots of wind
 bool   tnl_bpos_set;
 double tnl_ownship_lat, tnl_ownship_lon;
 double cur_lat, cur_lon;
 double tnl_hdm, tnl_hdt;
-double tnl_sog, tnl_cog;
+double SOG, COG;
 double tnl_mark_brng, tnl_mark_rng;
 double hdt_last_message, sog_last_message;
-double tack_angle, lay_angle, wind_dir_true, wind_speed;
+double tack_angle, lay_angle;
 double lgth_line;
 
+struct wind{
+    double TWA;
+    double RWA;
+    double TWS;
+    double RWS;
+} Wind;
+
 bool  tnl_shown_dc_message;
-wxTextCtrl        *plogtc;
-wxDialog          *plogcontainer;
 
 wxPoint boat_center, mark_center;
 double temp_mark_lat = 0.0,temp_mark_lon = 0.0;
 
 PlugIn_Route *m_pRoute = NULL;
 PlugIn_Waypoint *m_pMark = NULL;
+
+wxFrame *frame;
+
+//wxGLContext     *m_context;
+
+//wxTextCtrl        *plogtc;
+//wxDialog          *plogcontainer;
+
+struct pol
+	{
+        double boat_speed[32];       // j_wdir
+	}wind_to_boat[10];             // i_wspd 
 
 
 extern "C" DECL_EXP opencpn_plugin* create_pi(void *ppimgr)
@@ -80,9 +108,7 @@ extern "C" DECL_EXP void destroy_pi(opencpn_plugin* p)
 }
 
 //---------------------------------------------------------------------------------------------------------
-//
 //    TnL PlugIn Implementation
-//
 //---------------------------------------------------------------------------------------------------------
 
 tackandlay_pi::tackandlay_pi(void *ppimgr)
@@ -99,7 +125,7 @@ int tackandlay_pi::Init(void)
 {
 
   tnl_overlay_transparency = .50; 
-
+/*
 //********************************************************************************************************
 //   Logbook window
     m_plogwin = new wxLogWindow(NULL, _T("TnL Event Log"));
@@ -111,7 +137,7 @@ int tackandlay_pi::Init(void)
     wxLogMessage(_T("TnL log opened"));
 
     ::wxDisplaySize(&m_display_width, &m_display_height);
-
+*/
 //****************************************************************************************
     m_pconfig = GetOCPNConfigObject();
     m_parent_window = GetOCPNCanvasWindow();
@@ -154,7 +180,7 @@ bool tackandlay_pi::DeInit(void)
         m_pRoute->pWaypointList->DeleteContents(true);
         DeletePlugInRoute( m_pRoute->m_GUID );
     }
-        RemovePlugInTool( m_tool_id );
+//        RemovePlugInTool( m_tool_id );
         return true;
 }
 
@@ -219,8 +245,13 @@ void tackandlay_pi::SetDefaults(void)  //This will be called upon enabling a Plu
 void tackandlay_pi::ShowPreferencesDialog(  wxWindow* parent )
 {
 		m_pOptionsDialog = new TnLDisplayOptionsDialog;
+
+        m_pOptionsDialog->load_POL_file();
         m_pOptionsDialog->Create(m_parent_window, this);
+
+
 		m_pOptionsDialog->Show();
+        m_pOptionsDialog->Refresh();
 }
 //*******************************************************************************
 // ToolBar Actions
@@ -234,13 +265,16 @@ void tackandlay_pi::OnToolbarToolCallback(int id)
 {
     if ( id == m_tool_id )
     {
-       if(!m_pRoute->pWaypointList->empty())
-       {
-               m_pRoute->pWaypointList->DeleteContents(true);
-               delete m_pRoute;
-       }
+        if (m_pRoute){
+           if(!m_pRoute->pWaypointList->empty())
+           {
+                   m_pRoute->pWaypointList->DeleteContents(true);
+                   delete m_pRoute;
+           }
+        }
     }
 }
+
 /*****************************************************************************
 
 bool tackandlay_pi::LoadConfig(void)
@@ -275,8 +309,8 @@ bool tackandlay_pi::SaveConfig(void)
       return true;
 }
 */
-//***************************/
 
+//***************************
 //Cursor position data 
 void tackandlay_pi::SetCursorLatLon(double lat, double lon)
 {
@@ -307,7 +341,7 @@ void tackandlay_pi::OnContextMenuItemCallback(int id)
  
 }
 
-// Boat Position Data passed from NMEA to plugin
+// Boat Position from Main program
 void tackandlay_pi::SetPositionFix(PlugIn_Position_Fix &pfix)
 {
       tnl_ownship_lat = pfix.Lat;
@@ -328,44 +362,45 @@ void tackandlay_pi::SetPositionFixEx(PlugIn_Position_Fix_Ex &pfix)
       if(tnl_hdt != hdt_last_message)
 		  hdt_last_message = tnl_hdt;
 
-	  tnl_sog = pfix.Sog;     
-      if(wxIsNaN(tnl_sog)) tnl_sog = 0.;
-      if(tnl_sog != sog_last_message)
-		  sog_last_message = tnl_sog;
+	  SOG = pfix.Sog;     
+      if(wxIsNaN(SOG)) SOG = 0.;
+      if(SOG != sog_last_message)
+		  sog_last_message = SOG;
 
 
       tnl_bpos_set = true;
 
 }
-
+// Wind data from NMEA stream
 void tackandlay_pi::SetNMEASentence( wxString &sentence )
 {
     m_NMEA0183 << sentence;
     if( m_NMEA0183.Parse()  == true)
     {
         if( m_NMEA0183.LastSentenceIDParsed == _T("MWV") )
-        {
-            double wind_speed = m_NMEA0183.Mwv.WindSpeed;
+        {               
+            if (m_NMEA0183.Mwv.WindSpeedUnits == _T("K"))
+            {
+                Wind.RWS = Wind.RWS / 1.852;
+            }
+            else if (m_NMEA0183.Mwv.WindSpeedUnits == _T("M"))
+            {
+                Wind.RWS = Wind.RWS / 1.1515;
+            }
 
-            if(  wind_speed < 100. )
-            {               
-                if (m_NMEA0183.Mwv.WindSpeedUnits == _T("K"))
-                {
-                    wind_speed = wind_speed / 1.852;
-                }
-                else if (m_NMEA0183.Mwv.WindSpeedUnits == _T("M"))
-                {
-                    wind_speed = wind_speed / 1.1515;
-                }
-
-                if(m_NMEA0183.Mwv.Reference == _T("R"))
-                {
-                   wind_dir_true = rad2deg(BTW(wind_speed, deg2rad(m_NMEA0183.Mwv.WindAngle), tnl_sog)) ;
-                }
-                else
-                {
-                   wind_dir_true = int(m_NMEA0183.Mwv.WindAngle) % 360;
-                }
+            if(m_NMEA0183.Mwv.Reference == _T("R"))
+            {
+                Wind.RWA = m_NMEA0183.Mwv.WindAngle;
+                Wind.RWS = m_NMEA0183.Mwv.WindSpeed;
+                Wind.TWA = rad2deg(BTW(Wind.RWS, deg2rad(Wind.RWA), SOG)) ;
+                Wind.TWS = VTW(Wind.RWS, deg2rad(Wind.RWA), SOG);
+            }
+            else
+            {
+                Wind.TWA = m_NMEA0183.Mwv.WindAngle;
+                Wind.TWS = m_NMEA0183.Mwv.WindSpeed;
+                Wind.RWA = rad2deg(BAW(Wind.TWS, deg2rad(Wind.TWA), SOG));
+                Wind.RWS = VAW(Wind.TWS, deg2rad(Wind.TWA), SOG);
             }
         }
     }
@@ -389,7 +424,6 @@ bool tackandlay_pi::RenderOverlay(wxDC &dc, PlugIn_ViewPort *vp)
 
 }
 // Called by Plugin Manager on main system process cycle
-
 bool tackandlay_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp)
 {
    tnl_shown_dc_message = 0;             // show message box if RenderOverlay() is called again
@@ -401,55 +435,116 @@ bool tackandlay_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp)
 		   GetCanvasPixLL(vp, &pp, tnl_ownship_lat, tnl_ownship_lon);
 		   boat_center = pp;										
 	   }
+       if (Wind.TWA != 0 || Wind.TWS != 0)
+       {
 
-      glPushAttrib(GL_COLOR_BUFFER_BIT | GL_LINE_BIT | GL_HINT_BIT);      //Save state
-      glEnable(GL_BLEND);
-      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-      glPushMatrix();
+          glPushAttrib(GL_COLOR_BUFFER_BIT | GL_LINE_BIT | GL_HINT_BIT);      //Save state
+          glEnable(GL_BLEND);
+          glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+          glPushMatrix();
 
-      glTranslated( boat_center.x, boat_center.y, 0);
+          glTranslated( boat_center.x, boat_center.y, 0);
 
-      glRotatef(tnl_hdt - 90, 0, 0, 1);        //correction for boat heading -90 for base north
+          glRotatef(tnl_hdt - 90, 0, 0, 1);        //correction for boat heading -90 for base north
 
-      // scaling...
-//      double scale_factor =  v_scale_ppm / radar_pixels_per_meter;	// screen pix/radar pix
+          // scaling...
+    //      double scale_factor =  v_scale_ppm / radar_pixels_per_meter;	// screen pix/radar pix
 
-//      glScaled( scale_factor, scale_factor, 1. );
+    //      glScaled( scale_factor, scale_factor, 1. );
 
-	   GLubyte red(0), green(255), blue(0), alpha(255);
+	       GLubyte red(0), green(255), blue(0), alpha(255);
 
-		tack_angle = 40;
-		lgth_line = 100;
-		lay_angle = 40;
+		    tack_angle = Max_VMG_TWA(Wind.TWS);
+		    lgth_line = 200;
+		    lay_angle = tack_angle;
 
-		glColor4ub(0, 255, 0, 255);	// red, green, blue,  alpha
-		Draw_Line(wind_dir_true + tack_angle, lgth_line);  // angle, lgth_line
-		Draw_Line(wind_dir_true - tack_angle, lgth_line);  // angle, lgth_line
-
-
-        glPopMatrix();
-        glPushMatrix();
-		if(temp_mark_lat > 0.0)
+            if(abs(Wind.TWA - COG) < 80)
             {
-                GetCanvasPixLL(vp, &mark_center, temp_mark_lat, temp_mark_lon);
-                Draw_Wind_Barb(mark_center, wind_dir_true, wind_speed);
-		        glTranslated( mark_center.x, mark_center.y, 0);
-                glRotatef(- 90, 0, 0, 1);
-                glColor4ub(255, 0, 0, 255);	// red, blue, green, alpha
-                Draw_Line(wind_dir_true + tack_angle, lgth_line);
-                Draw_Line(wind_dir_true - tack_angle, lgth_line);
+		        glColor4ub(0, 255, 0, 255);	// red, green, blue,  alpha
+		        Draw_Line(Wind.TWA + tack_angle, lgth_line);  // angle, lgth_line
+		        Draw_Line(Wind.TWA - tack_angle, lgth_line);  // angle, lgth_line
             }
 
-      glPopMatrix();
-      glPopAttrib();
+            glPopMatrix();
+            glPushMatrix();
+		    if(temp_mark_lat > 0.0)
+                {
+                    GetCanvasPixLL(vp, &mark_center, temp_mark_lat, temp_mark_lon);
+                    Draw_Wind_Barb(mark_center, Wind.TWA, Wind.TWS);
+		            glTranslated( mark_center.x, mark_center.y, 0);
+                    glRotatef(- 90, 0, 0, 1);
+                    glColor4ub(255, 0, 0, 255);	// red, blue, green, alpha
+                    Draw_Line(Wind.TWA + 180 + lay_angle, lgth_line);
+                    Draw_Line(Wind.TWA + 180 - lay_angle, lgth_line);
+                }
 
+          glPopMatrix();
+          glPopAttrib();
+          Wind.TWS = 0;
+          Wind.TWA = 0;
+       }
 	  return true;
 }
 
-void tackandlay_pi::Draw_Line(int angle,int lgth_line)
+double tackandlay_pi::Calc_VMG( double TWA,  double SOG)
 {
-	double x = cos(angle * PI / 180. ) * lgth_line;
-	double y = sin(angle * PI / 180.) * lgth_line;
+    double speed = abs( SOG * cos(deg2rad(TWA)));
+    return speed;
+}
+
+double tackandlay_pi::Calc_VMC(double COG, double SOG, double BTM)
+{
+    double speed = SOG * cos(deg2rad(COG-BTM));
+    return speed;
+}
+
+double tackandlay_pi::Polar_SOG (double TWS, double TWA)
+{
+    double SOG = 0, SOG2 = 0;
+    int j_wdir = int((TWA - 25)/5);
+    int i_wspd = int(TWS/5);
+    for (i_wspd; i_wspd = 0; i_wspd--)
+    {
+        SOG = wind_to_boat[i_wspd].boat_speed[j_wdir];
+        if (SOG > 0) i_wspd = 0;
+    }
+
+    SOG2 = wind_to_boat[i_wspd + 1].boat_speed[j_wdir + 1]; // next data point value
+    if (SOG2 > 0)
+    {
+        SOG += (SOG2-SOG) *( (TWA -(j_wdir*5 + 25))/5); // pro-rate delta
+    }
+    return SOG;
+}
+
+double tackandlay_pi::Max_VMG_TWA(double TWS)
+{
+    double speed, max_speed = 0;
+    double TWA;
+    int j_wdir;
+    int i_wspd = (int)(TWS/5);
+
+    for (j_wdir = 0; j_wdir < 15; j_wdir++) // 25->90 deg TWA
+    {
+        speed = wind_to_boat[i_wspd].boat_speed[j_wdir];
+        TWA = j_wdir *5 + 25;
+        speed = Calc_VMG(TWA, speed);             //VMG to wind
+        if (speed > max_speed)
+        {
+            max_speed = speed;
+        }
+        else
+        {
+            j_wdir = 15;
+        }
+    }
+    return TWA;
+}
+
+void tackandlay_pi::Draw_Line(int angle,int legnth)
+{
+	double x = cos(angle * PI / 180. ) * legnth;
+	double y = sin(angle * PI / 180.) * legnth;
 
     glBegin(GL_LINES);
     glVertex2d(0.0, 0.0);
@@ -525,18 +620,29 @@ BEGIN_EVENT_TABLE ( TnLDisplayOptionsDialog, wxDialog )
 
 END_EVENT_TABLE()
 
+
+
 TnLDisplayOptionsDialog::TnLDisplayOptionsDialog()
 {
-	Init();
+    display_speed = 10;
+	windColour[0] = wxTheColourDatabase->Find(_T("YELLOW"));
+	windColour[1] = wxTheColourDatabase->Find(_T("CORAL"));
+	windColour[2] = wxTheColourDatabase->Find(_T("CYAN"));
+	windColour[3] = wxTheColourDatabase->Find(_T("LIGHT BLUE"));
+	windColour[4] = wxTheColourDatabase->Find(_T("CORNFLOWER BLUE"));
+	windColour[5] = wxTheColourDatabase->Find(_T("GREEN"));
+	windColour[6] = wxTheColourDatabase->Find(_T("BROWN"));
+	windColour[7] = wxTheColourDatabase->Find(_T("RED"));
+	windColour[8] = wxTheColourDatabase->Find(_T("VIOLET RED"));
+	windColour[9] = wxTheColourDatabase->Find(_T("VIOLET"));
+//	Init();
 }
 
  TnLDisplayOptionsDialog::~TnLDisplayOptionsDialog()
 {
+    	m_panelPolar->Disconnect( wxEVT_PAINT, wxPaintEventHandler( TnLDisplayOptionsDialog::OnPaintPolar ), NULL, this );
 }
 
-void TnLDisplayOptionsDialog::Init()
-{
-}
 
 bool TnLDisplayOptionsDialog::Create( wxWindow *parent, tackandlay_pi *ppi )
 {
@@ -544,25 +650,175 @@ bool TnLDisplayOptionsDialog::Create( wxWindow *parent, tackandlay_pi *ppi )
     pPlugIn = ppi;
 
 //	wxDialog *PreferencesDialog = new wxDialog( parent, wxID_ANY, _("BR24 Target Display Preferences"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE );
-	if ( !wxDialog::Create ( parent, wxID_ANY, _T("TnL  Characteristics"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE ) )
+	if ( !wxDialog::Create ( parent, wxID_ANY, _T("TnL  Characteristics"), wxPoint(100,50), wxDefaultSize, wxDEFAULT_DIALOG_STYLE ) )
         return false;
 
-    int border_size = 4;
+    //this->SetSizeHints( wxDefaultSize, wxDefaultSize );
+
 	wxBoxSizer* topSizer = new wxBoxSizer ( wxVERTICAL );
     SetSizer ( topSizer );
+    
+	bSizerNotebook = new wxBoxSizer( wxVERTICAL );	
+	m_notebook = new wxNotebook( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0 );
 
-    wxBoxSizer* DisplayOptionsBox = new wxBoxSizer(wxVERTICAL);
-    topSizer->Add (DisplayOptionsBox, 0, wxALIGN_CENTER_HORIZONTAL|wxALL|wxEXPAND, 2 );
+    m_panelPolar = new wxPanel( m_notebook, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL );
 
+	m_panelPolar->SetBackgroundColour( wxColour( 255, 255, 255 ) );
+	m_panelPolar->SetMinSize( wxSize( 400,600 ) );
+    m_notebook->AddPage( m_panelPolar, _("Polar Diagram"), true );
+
+    bSizerNotebook->Add( m_notebook, 1, wxEXPAND | wxALL, 5 );
+    topSizer->Add(bSizerNotebook);
+   
 // Accept/Reject buttoen	
     wxStdDialogButtonSizer* DialogButtonSizer = wxDialog::CreateStdDialogButtonSizer(wxOK|wxCANCEL);
-    DisplayOptionsBox->Add(DialogButtonSizer, 0, wxALIGN_RIGHT|wxALL, 5);
+    topSizer->Add(DialogButtonSizer, 0, wxALIGN_RIGHT|wxALL, 5);
+
+	this->Layout();
 
     DimeWindow(this);
     Fit();
     SetMinSize(GetBestSize());
 
+    m_panelPolar->Connect( wxEVT_PAINT, wxPaintEventHandler( TnLDisplayOptionsDialog::OnPaintPolar ), NULL, this );
+
     return true;
+}
+
+void TnLDisplayOptionsDialog::createDiagram(wxDC& dc)
+{
+	max_dimension = m_panelPolar->GetSize();
+	center.x = max_dimension.x / 2 - 190;
+	center.y = max_dimension.y /2;
+	image_pixel_height[0] = max_dimension.y /2 -40 ;           // current height for denumerator
+	pixels_knot_ratio = image_pixel_height[0] / display_speed;
+	for(int i = 0; i < display_speed; i++)
+		image_pixel_height[i] = wxRound(pixels_knot_ratio*(i+1));
+}
+
+void TnLDisplayOptionsDialog::Render_Polar()
+{
+//********** Draw Rings and speeds***********************
+	int pos_xknt, pos_yknt,neg_yknt;
+
+	for(int i = display_speed-1; i >= 0; i--)
+	{
+		pos_xknt = wxRound(cos((0-90)*(PI/180.0))*image_pixel_height[i]+center.x);
+		pos_yknt = wxRound(sin((0-90)*(PI/180.0))*image_pixel_height[i]+center.y);
+		neg_yknt = wxRound(sin((0+90)*(PI/180.0))*image_pixel_height[i]+center.y);
+ 
+        dc->DrawArc(center.x,center.y+image_pixel_height[i],center.x,center.y-image_pixel_height[i],center.x,center.y);
+              
+            if(display_speed < 20){
+			    dc->DrawText(wxString::Format(_T("%i"),i+1),wxPoint(pos_xknt,pos_yknt-10));
+                dc->DrawText(wxString::Format(_T("%i"),i+1),wxPoint(pos_xknt,neg_yknt-10));
+            }
+            else{
+				if((display_speed == 20 && ((i+1) % 2) == 0) || (display_speed == 25 && ((i+1) % 3) == 0)){
+				    dc->DrawText(wxString::Format(_T("%i"),i+1),wxPoint(pos_xknt,pos_yknt-10));
+                    dc->DrawText(wxString::Format(_T("%i"),i+1),wxPoint(pos_xknt,neg_yknt-10));
+                }
+			}
+	}
+//********** Draw Spokes *********************************
+	int angle = 20;
+	for(; angle <= 180; angle += 10)
+	{
+		int xt = wxRound(cos((angle-90)*(PI/180.0))*(image_pixel_height[(int)display_speed-1]+20)+center.x);
+		int yt = wxRound(sin((angle-90)*(PI/180.0))*(image_pixel_height[(int)display_speed-1]+20)+center.y);
+
+		dc->DrawLine(wxPoint(center.x,center.y),wxPoint(xt,yt));
+		dc->DrawText(wxString::Format(_T("%i\xB0"),angle), wxPoint(xt,yt));
+	}
+
+	createSpeedBullets();
+}
+
+void TnLDisplayOptionsDialog::createSpeedBullets()
+{
+    int selected_i_wspd =  0;      // initially 0
+	
+	int end_index;
+	int xt, yt, bullet_point_count;
+	wxPoint ptBullets[180];             // max of 180 degrees
+
+	if(selected_i_wspd != 0) {
+        selected_i_wspd -= 1;
+        end_index = selected_i_wspd + 1;
+    }
+	else{
+        selected_i_wspd = 0;                  // all speeds
+        end_index = 10;
+    }
+
+	double speed_in_pixels;
+	wxColour Colour,brush;
+	wxPen init_pen = dc->GetPen();			// get actual Pen for restoring later
+
+    for(int i_wspd = selected_i_wspd; i_wspd < end_index; i_wspd++)									// go thru all winddirection-structures depending on choiocebox degrees
+	{
+		bullet_point_count = 0;
+		Colour = windColour[i_wspd];
+        brush = windColour[i_wspd];
+
+		for(int j_wdir = 0; j_wdir < 33; j_wdir++)          // 0->31
+		{
+            double cell_value = wind_to_boat[i_wspd].boat_speed[j_wdir];
+			if( cell_value > 0) 
+                {
+			        speed_in_pixels = cell_value * pixels_knot_ratio;
+
+			        xt = wxRound(cos(((j_wdir*5+25)- 90)*PI/180)*speed_in_pixels + center.x);		// calculate the point for the bullet
+			        yt = wxRound(sin(((j_wdir*5+25)- 90)*PI/180)*speed_in_pixels + center.y);
+
+                    wxPoint pt(xt,yt);
+				    ptBullets[bullet_point_count++] = pt;      // Add to display array
+            }
+		}
+
+//************ Wind_sped Column, plot curve and bullets ********************
+
+		if(bullet_point_count > 2)					//Draw curves, needs min. 3 points
+		{
+			dc->SetPen(wxPen(Colour,3));
+			dc->DrawSpline(bullet_point_count,ptBullets);
+		}
+  	
+		for(int i = 0; i < bullet_point_count; i++)     // draw the bullet
+		{
+			if(ptBullets[i].x != 0 && ptBullets[i].y != 0)
+			{            
+		    dc->SetBrush( brush );
+			dc->SetPen(wxPen(wxColour(0,0,0),2));
+			dc->DrawCircle(ptBullets[i],5);	
+			ptBullets[i].x = ptBullets[i].y = 0;
+			}
+		} 
+	}
+
+	dc->SetPen(init_pen);
+}
+
+void TnLDisplayOptionsDialog::OnPaintPolar( wxPaintEvent& event )
+{
+	wxPaintDC dc(m_panelPolar);
+	this->dc = &dc;
+	this->createDiagram(dc);
+    this->Render_Polar();
+}
+
+void TnLDisplayOptionsDialog::OnSizePolar( wxSizeEvent& event )
+{
+	m_panelPolar->Fit();
+	m_panelPolar->Refresh();
+}
+
+void TnLDisplayOptionsDialog::OnSizePolarDlg( wxSizeEvent& event )
+{
+	Layout();
+	Refresh();
+//	m_panelPolar->Fit();
+//	m_panelPolar->Refresh();
 }
 
 void TnLDisplayOptionsDialog::OnClose ( wxCloseEvent& event )
@@ -570,12 +826,116 @@ void TnLDisplayOptionsDialog::OnClose ( wxCloseEvent& event )
 //     pPlugIn->SaveConfig();
 }
 
-
 void TnLDisplayOptionsDialog::OnIdOKClick ( wxCommandEvent& event )
 {
 //+     pPlugIn->SaveConfig();
 }
 
+//******************************************************************
+//************** Polar Table input ********************************
+
+void TnLDisplayOptionsDialog::load_POL_file(void)
+{
+    wxString filetypext = _("*.pol");
+	wxFileDialog fdlg(this,_("Select a POL File (.pol)"),_T(""), _T(""), filetypext, wxFD_OPEN|wxFD_FILE_MUST_EXIST );
+	if(fdlg.ShowModal() == wxID_CANCEL) return;
+
+	wxFileInputStream stream( fdlg.GetPath() );							
+	wxTextInputStream in(stream);	
+	wxString wdirstr,wsp;
+
+	bool test_first = true;
+	wxString file_type = _("");
+    int file_line = -1;
+
+    wxStringTokenizer tkz;              // Selected Parsing character
+
+	while(!stream.Eof())
+	{
+		wxString str = in.ReadLine();
+
+//************ File type test phase (one run) ************************
+		if(test_first)
+		{
+            if(str.GetChar(0) == '5') {           // our POL (or csv)
+				file_type = _("POL/CSV");
+                wxStringTokenizer tk(str,_T(" "),wxTOKEN_RET_EMPTY);
+				tkz = tk;
+            }
+			else if(str.Contains(_T("TWA/TWS"))) {    // TAB specials
+				file_type = _("QTV");
+                wxStringTokenizer tk(str,_T("\t"),wxTOKEN_RET_EMPTY);	
+				tkz = tk;
+            }
+			else if (str.Contains(_T("TWA"))) {
+				file_type = _("MAXSEA");
+                wxStringTokenizer tk(str,_T("\t"),wxTOKEN_RET_EMPTY);	
+				tkz = tk;
+            }
+			else
+			{
+				wxMessageBox(_T("File doesn't match known types."));
+				return;
+			}
+
+			test_first = false;
+
+			if( file_type != _("POL/CSV"))     // Tab special files have header lines
+				continue;
+		}
+
+// *************Data Phase *************************************
+/*        
+		wxString field = tkz.GetNextToken();
+		if (file_type == _T("TWA/TWS") && field == _T("0") ){
+            continue;
+        }
+*/		
+
+        tkz.SetString(str);
+        int j_wdir = 0;
+        int i_wspd = file_line;
+
+//****************** POL file processing ****************************
+		if (file_type == _("POL/CSV"))       // TODO stregnthen file parsing                               // standard POL and csv
+		{
+			wxString field_value;
+            double number;
+            tkz.GetNextToken();     // First field is Wind speed
+
+			while(tkz.HasMoreTokens())
+			{                         
+				field_value = tkz.GetNextToken(); // Find wind direction (20 & up) 
+                field_value.ToDouble(&number);
+
+				if(number < 20.)         // test for Boat Speed
+                {
+                    wind_to_boat[i_wspd].boat_speed[j_wdir] = number;
+                    tkz.GetNextToken();     // go past next angle
+                    j_wdir++;
+                }
+
+                
+            }
+		}
+//************************************************************
+        else if(file_type ==  _("QTV") || file_type == _("MAXSEA"))                              // special format
+		{
+			int i_ws_col = 0, token_count = 0; 
+			wxString s;
+			while(tkz.HasMoreTokens())
+			{
+				token_count++;
+				if(token_count > 11) break;
+				s = tkz.GetNextToken();
+//				if(s == _T("0") && (file_type == 1 || file_type == 2)) continue;
+//				dlg->m_gridEdit->SetCellValue(file_line,i_ws_col,s);
+//				load_POL_datum_str(s,file_line,i_ws_col++);
+			}
+		}
+        file_line++;
+	}
+}
 
 /********************************************************************************************************/
 //   Distance measurement for simple sphere
@@ -584,12 +944,12 @@ double twoPI = 2 * PI;
 
 static double deg2rad(double deg)
 {
-    return (deg * PI / 180.0);
+    return ((90 - deg * PI / 180.0));
 }
 
 static double rad2deg(double rad)
 {
-    return (rad * 180.0 / PI);
+    return (int(rad * 180.0 / PI + 90 + 360) % 360);
 }
 
 static double local_distance (double lat1, double lon1, double lat2, double lon2) {
@@ -623,19 +983,6 @@ double VTW(double VAW, double BAW, double SOG)
 double BTW(double VAW, double BAW, double SOG)
 {
     double BTW_value = atan((VAW * sin(BAW))/(VAW * cos(BAW)-SOG));
-    if (BAW < PI){
-        if (BTW_value < 0){
-            BTW_value = PI + BTW_value;
-        }
-    }
-    if (BAW > PI){
-        if (BTW_value > 0){
-            BTW_value = PI + BTW_value;
-        }
-        if (BTW_value < 0){
-            BTW_value = PI * 2 + BTW_value;
-        }
-    }
     return BTW_value;
 }
 
@@ -648,18 +995,7 @@ double VAW(double VTW, double BTW, double SOG)
 double BAW(double VTW, double BTW,double SOG)
 {
     double BAW_value = atan((VTW * sin(BTW))/(VTW * cos(BTW)+ SOG));
-    if (BTW < PI){
-        if (BAW_value < 0){
-            BAW_value = PI + BAW_value;
-        }
-    }
-    if (BTW > 3.1416){
-        if (BAW_value > 0){
-            BAW_value = PI + BAW_value;
-        }
-        if (BAW_value < 0){
-            BAW_value = PI * 2 + BAW_value;
-        }
-    }
     return BAW_value;
 }
+
+

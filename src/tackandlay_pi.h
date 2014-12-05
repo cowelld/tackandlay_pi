@@ -29,6 +29,9 @@
 #include "wx/wxprec.h"
 
 #include "version.h"
+#include "wx/wx.h"
+#include <wx/glcanvas.h>
+#include "ocpnDC.h"
 
 #ifndef  WX_PRECOMP
   #include "wx/wx.h"
@@ -36,6 +39,9 @@
 
 #define     MY_API_VERSION_MAJOR    1
 #define     MY_API_VERSION_MINOR    11
+
+#define     PLUGIN_VERSION_MAJOR    0
+#define     PLUGIN_VERSION_MINOR    1
 
 #ifndef PI
       #define PI        3.1415926535897931160E0      /* pi */
@@ -84,17 +90,21 @@ public:
       int GetToolbarToolCount(void);
       void OnToolbarToolCallback(int id);
 
-      bool RenderOverlay(wxDC &dc, PlugIn_ViewPort *vp);
-      bool RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp);
+      double Calc_VMG(double TWA, double SOG);
+      double Calc_VMC(double COG, double SOG, double BTM);
+      double Polar_SOG (double TWS, double TWA);
+      double Max_VMG_TWA(double TWS);
       void Draw_Line(int angle,int legnth);
       void Draw_Wind_Barb(wxPoint pp,  double true_wind, double speed);
 
-// Other public methods
+      bool RenderOverlay(wxDC &dc, PlugIn_ViewPort *vp);
+      bool RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp);
+      
 
 //      void OnTnLControlDialogClose();         // Control dialog
 //      void UpdateDisplayParameters(void);
 
-
+	TnLDisplayOptionsDialog     *m_pOptionsDialog;
 private:
 //	  bool LoadConfig(void);
 //      bool SaveConfig(void);
@@ -110,8 +120,9 @@ private:
     wxBitmap          *m_pdeficon;
     NMEA0183         m_NMEA0183;
 
-    wxLogWindow		*m_plogwin;
-	TnLDisplayOptionsDialog     *m_pOptionsDialog;
+//    wxLogWindow		*m_plogwin;
+
+
 };
 //----------------------------------------------------------------------------------------------------------
 //    Tack and Lay Line DisplayOptions Dialog Specification
@@ -123,23 +134,43 @@ class TnLDisplayOptionsDialog: public wxDialog
       DECLARE_EVENT_TABLE()
 
       public:
-
             TnLDisplayOptionsDialog( );
             ~TnLDisplayOptionsDialog( );
-            void Init();
+
             bool Create(  wxWindow *parent, tackandlay_pi *ppi);
-            void CreateDisplayOptions();
+
+            void load_POL_file();
+            void Render_Polar();
+	        void createDiagram(wxDC& dc);
+            void OnPaintPolar( wxPaintEvent& event );
+		    void OnSizePolar( wxSizeEvent& event );
+            void OnSizePolarDlg( wxSizeEvent& event );
+
+	        void createSpeedBullets();
 
       private:
             void OnClose(wxCloseEvent& event);
             void OnIdOKClick( wxCommandEvent& event );
 
-			wxWindow          *pParent;
-            tackandlay_pi      *pPlugIn;
+            wxWindow        *pParent;
+            tackandlay_pi   *pPlugIn;
 
+            wxColour		windColour[10];
+            wxBoxSizer      *bSizerNotebook;
+            wxNotebook      *m_notebook;
+            wxPanel         *m_panelPolar;
+            wxDC            *dc;
+
+            wxSize			max_dimension;
+            wxPoint         center;
+	        int				radius;
+	        double			image_pixel_height[24];                 // display height in pixels
+	        int             display_speed;
+            double			pixels_knot_ratio;
             // DisplayOptions
 	  wxTextCtrl        *pText_Tack_Angle_Polar;
 };
+
 
 static double deg2rad(double deg);
 static double rad2deg(double rad);
@@ -149,4 +180,5 @@ double VTW(double VAW, double BAW, double SOG);
 double BTW(double VAW, double BAW, double SOG);
 double VAW(double VTW, double BTW, double SOG);
 double BAW(double VTW, double BTW,double SOG);
+
 #endif

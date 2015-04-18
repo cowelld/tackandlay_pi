@@ -151,14 +151,14 @@ TnLactive = false;
 //****************************************************************************************
  
     return (
+            WANTS_TOOLBAR_CALLBACK     |
+            INSTALLS_TOOLBAR_TOOL      |
+            WANTS_CONFIG               |
             WANTS_DYNAMIC_OPENGL_OVERLAY_CALLBACK |
             WANTS_OPENGL_OVERLAY_CALLBACK |
             WANTS_OVERLAY_CALLBACK     |
             WANTS_CURSOR_LATLON        |
-            WANTS_TOOLBAR_CALLBACK     |
-            INSTALLS_TOOLBAR_TOOL      |
-            INSTALLS_CONTEXTMENU_ITEMS |
-            WANTS_CONFIG               |
+            INSTALLS_CONTEXTMENU_ITEMS |           
             WANTS_NMEA_SENTENCES       |
             WANTS_NMEA_EVENTS          |
             WANTS_PREFERENCES
@@ -338,13 +338,13 @@ void tackandlay_pi::clear_Master_pol()
 {
 	for(int i = 0; i < 10; i++)
 	{
+        Master_pol[i].TWS = 0;
+
 		for(int n = 0; n < 60; n++)
 		{
-			Master_pol[i].wdir[n] = 0;
-			Master_pol[i].wdirMax[n] = 0;
-			Master_pol[i].wdirTotal[n] = 0;
-            Master_pol[i].wdirAve[n] = 0;
-            Master_pol[i].count[n] = 0;
+			Master_pol[i].TWA[n] = 0;
+			Master_pol[i].boat_speed[n] = 0;
+
 		}
 	}
 }
@@ -354,148 +354,134 @@ void tackandlay_pi::load_POL_file(wxString file_name)
     if (!file_name.IsEmpty())
     {
 	    clear_Master_pol();
+        
+        wxTextFile   m_infile;
+        m_infile.Open(file_name);
 
-	    wxFileInputStream stream( file_name );							
-	    wxTextInputStream in(stream);	
-	    wxString wdirstr,wsp;
+	    int file_type = -1;
+        wxStringTokenizer tkz;              // Selected Parsing character
+        wxString token_string;
 
-        int file_line = -1;
+        long TWA_count = m_infile.GetLineCount(); //  Row count for TWA incrementing 
 
-        wxString str = in.ReadLine();
-        if( find_POL_type(str) )
-        {
-	        while(!stream.Eof())
-	        {
-		        if(file_line == -1)
-			        file_line = 0;          // starting at file line 0 (col 0)
-                else
-                    str = in.ReadLine();
+//***************** Header and Wind Speeds *********************************
+        wxString in_str =  m_infile.GetFirstLine();
 
-        //			if( file_type != 0)
-        //				continue;
-        /*
-		        wxString u = tkz.GetNextToken();                        // first field (wind speed)
-		        if(u == _T("0") && file_type == 1){
-                    file_line++;
-                    continue;
-                }
-        */		
-                tkz.SetString(str);
+        wxString temp;
 
-        //***************************************************************************************************		
-		        if (file_type == 0)                                      // standard POL and csv
-		        {
-			        wxString s;
-                    i_wspd = file_line;
-                    j_wdir = 0;
-                    tkz.GetNextToken();                             // Wind Speed
-                    tkz.GetNextToken();
-
-			        while(tkz.HasMoreTokens())
-			        {
-				        s = tkz.GetNextToken();
-                        s.ToDouble(&number);
-
-				        if(number < initial_Dir){                            // Wind Angle
-                            Master_pol[i_wspd].wdirMax[j_wdir] = number;
-                            tkz.GetNextToken();
-                        }
-                        j_wdir++;
-                    }
-		        }
-
-                else if(file_type == 1 || file_type == 2)                              // special format
-		        {
-			        i_wspd = file_line;
-                    j_wdir = 0;
-                    int token_count = 0; 
-			        wxString s;
-			        while(tkz.HasMoreTokens())
-			        {
-				        token_count++;
-				        if(token_count > 10) break;
-				        s = tkz.GetNextToken();
-
-                        s.ToDouble(&number);
-
-				        if(number < 20.){                            // Wind Angle
-                                Master_pol[i_wspd].wdirMax[j_wdir] = number;
-                                tkz.GetNextToken();        
-                        }
-                        j_wdir++;
-			        }
-		        }
-
-                file_line++;
-	        }
-            Master_pol_loaded = true;
+        if(in_str.Find(_T("\t"))!= wxNOT_FOUND){
+			file_type = 1;
+            wxStringTokenizer tk(in_str,_T("\t"),wxTOKEN_RET_EMPTY);	
+			tkz = tk;
         }
-    }
-}
 
-bool tackandlay_pi::find_POL_type(wxString str)
-{
-    wxString temp;
-    bool file_OK = false;
+        if(in_str.Find(_T(";"))!= wxNOT_FOUND){
+            file_type = 1;
+            wxStringTokenizer tk(in_str,_T(";"),wxTOKEN_RET_EMPTY);	
+			tkz = tk;
+        }
 
-	if(str.Contains(_T("TWA/TWS"))) {
-		file_type = 1;
-        wxStringTokenizer tk(str,_T("\t"),wxTOKEN_RET_EMPTY);	
-		tkz = tk;
-        file_OK = true;
-    }
-	else if (str.Contains(_T("TWA"))) {
-		file_type = 2;
-        wxStringTokenizer tk(str,_T("\t"),wxTOKEN_RET_EMPTY);	
-		tkz = tk;
-        file_OK = true;
-    }
-    //csv file
-	else if(str.Contains (_(","))) {
-        file_type = 0;
-        wxStringTokenizer tk(str,_T(","),wxTOKEN_RET_EMPTY);
-		tkz = tk;
-        tkz.SetString(str);
-        temp = tkz.GetNextToken();
-        temp = tkz.GetNextToken();
-        Wind_Speed_increment = wxAtol(temp);
-        temp = tkz.GetNextToken();
-        initial_Dir = wxAtol(temp);
-        temp = tkz.GetNextToken();
-        if (wxAtol(temp) < initial_Dir)
-            temp = tkz.GetNextToken();
-        Wind_Dir_increment = wxAtoi(temp) - initial_Dir;
-        Max_dir_pol_index = (180 - initial_Dir) / Wind_Dir_increment + 1;
-        file_OK = true;
-    }
-    else if(str.Contains (_(" "))) {
-        file_type = 0;
-        wxStringTokenizer tk(str,_T(" "),wxTOKEN_RET_EMPTY);
-		tkz = tk;
-        tkz.SetString(str);
-        temp = tkz.GetNextToken();
-        Wind_Speed_increment = wxAtol(temp);
-        temp = tkz.GetNextToken();
-        initial_Dir = wxAtol(temp);
-        temp = tkz.GetNextToken();
-        if (wxAtol(temp) < initial_Dir)
-            temp = tkz.GetNextToken();
-        Wind_Dir_increment = wxAtoi(temp) - initial_Dir;
-        Max_dir_pol_index = (180 - initial_Dir) / Wind_Dir_increment + 1;
-        file_OK = true;
-    }
-    else 
-	{
-		wxMessageBox(_T("Cannot load this file"));
-        file_OK = false;
-	}
+	    if(in_str.Find (_(","))!= wxNOT_FOUND)
+        {
+            file_type = 1;
+            wxStringTokenizer tk(in_str,_T(","),wxTOKEN_RET_EMPTY);
+		    tkz = tk;
+        }
+
+        if(in_str.Find (_("    "))!= wxNOT_FOUND)   // Linux tab substitution
+        {
+            file_type = 1;
+            wxStringTokenizer tk(in_str,_T("     "),wxTOKEN_RET_EMPTY);
+		    tkz = tk;
+        }
+
+        if((file_type == -1) && (in_str.Find (_(" ")) != wxNOT_FOUND))
+        {
+            file_type = 1;
+            wxStringTokenizer tk(in_str,_T(" "),wxTOKEN_RET_EMPTY);
+		    tkz = tk;
+        }
+
+        if (file_type == -1)
+	    {
+		    wxMessageBox(_T("Cannot load this file"));
+		    return;
+	    }
+
+//************************ Wind Speeds *************************************** 
+        in_str =  m_infile.GetFirstLine();
+        long wind_speed_count = tkz.CountTokens(); // TWS count for incrementing
+        long wind_speed;
+        long wind_angle, TWA_line = 1;
+        double boat_speed;
+        int wspd_zero = 0;
+
+        token_string = tkz.GetNextToken(); // burn TWA\TWS etc
     
-    wxString file_message = wxString::Format(_("Wind_speed_increment %i \nWind_Dir_increment %i\ninitial_Dir %i\n Number of bins %i"),
-        Wind_Speed_increment, Wind_Dir_increment, initial_Dir, Max_dir_pol_index );
-    wxMessageBox(file_message);
+        for (i_wspd= 0; i_wspd < 15; i_wspd++)
+	    {
+		    token_string = tkz.GetNextToken();
+            if(token_string == _("0")){
+                token_string = tkz.GetNextToken();
+                wspd_zero = 1;
+            }
+            token_string.ToLong(&wind_speed);
+            Master_pol[i_wspd].TWS = wind_speed;
+            if(wind_speed_count > 20) token_string = tkz.GetNextToken();
+        }
 
-	return file_OK;
+//************************* Wind Angle, Boat_speed data *********************
+
+
+        in_str =  m_infile.GetNextLine();       // check for zero line
+        tkz.SetString(in_str);
+        token_string = tkz.GetNextToken();
+
+        if(token_string != _("0"))
+            m_infile.GetFirstLine();
+    
+        for(int i_TWA = 0; i_TWA < 60; i_TWA++)
+        {
+            if (TWA_line < TWA_count)
+            {
+                in_str =  m_infile.GetNextLine();
+                tkz.SetString(in_str);
+
+                if(file_type == 1)              // Normal format
+		        {
+                    token_string = tkz.GetNextToken();
+                    token_string.ToLong(&wind_angle);
+                    Master_pol[0].TWA[i_TWA] = wind_angle;
+                    if(wspd_zero > 0) token_string = tkz.GetNextToken(); // account for 0 wind speed collumn
+
+                    for (i_wspd= 1; i_wspd < 15; i_wspd++)
+	                {
+		                token_string = tkz.GetNextToken();
+                        token_string.ToDouble(&boat_speed);
+                        Master_pol[i_wspd].boat_speed[i_TWA] = boat_speed;
+            
+                        if(wind_speed_count > 20) token_string = tkz.GetNextToken();
+			        }
+                } 
+                TWA_line = TWA_line + 1;
+
+                if(TWA_count > 33 && TWA_line < TWA_count){
+                    TWA_line = TWA_line + 1;
+                    in_str =  m_infile.GetNextLine();
+                }
+
+                if(TWA_count > 48 && TWA_line < TWA_count){
+                    TWA_line = TWA_line + 1;
+                    in_str =  m_infile.GetNextLine();
+                }
+            }       
+        }
+        if (file_type != -1 && wind_speed_count > 0)
+            Master_pol_loaded = true;
+    }
 }
+
+
 
 //***************** Cursor position data **********
  
@@ -540,6 +526,7 @@ void tackandlay_pi::SetPositionFix(PlugIn_Position_Fix &pfix)
       POS_warn = false;
 
 }
+
 void tackandlay_pi::SetPositionFixEx(PlugIn_Position_Fix_Ex &pfix)
 {
       boat_lat = pfix.Lat;
@@ -581,15 +568,15 @@ void tackandlay_pi::SetNMEASentence( wxString &sentence )
             {
                 Wind.RWA = m_NMEA0183.Mwv.WindAngle;
                 Wind.RWS = wind_speed;
-                Wind.TWA = TWA(Wind.RWS, Wind.RWA, Boat.SOG) ;
-                Wind.TWS = TWS(Wind.RWS, Wind.RWA, Boat.SOG);
+                Wind.TWA = fTWA(Wind.RWS, Wind.RWA, Boat.SOG) ;
+                Wind.TWS = fTWS(Wind.RWS, Wind.RWA, Boat.SOG);
             }
             else
             {
                 Wind.TWA = m_NMEA0183.Mwv.WindAngle;
                 Wind.TWS = wind_speed;
-                Wind.RWA = RWA(Wind.TWS, Wind.TWA, Boat.SOG);
-                Wind.RWS = RWS(Wind.TWS, Wind.TWA, Boat.SOG);
+                Wind.RWA = fRWA(Wind.TWS, Wind.TWA, Boat.SOG);
+                Wind.RWS = fRWS(Wind.TWS, Wind.TWA, Boat.SOG);
             }
         }
 /*        if( m_NMEA0183.LastSentenceIDParsed == _T("MWD") )
@@ -630,7 +617,7 @@ bool tackandlay_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp)
                 glEnable(GL_BLEND);
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
                 glPushMatrix();
-               if (Wind.TWS > 2)
+  //             if (Wind.TWS > 2)
                {
                     GetCanvasPixLL(vp, &pp, boat_lat, boat_lon);
 		            boat_center = pp;
@@ -640,20 +627,19 @@ bool tackandlay_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp)
                     Draw_Wind_Barb(boat_center, Wind.TWD, Wind.TWS);
 
 		            if(Wind.RWA < 90 || Wind.RWA > 270) // Wind forward
-                    {
-                        tack_angle = Max_VMG_TWA(Wind.TWS, Wind.TWA);
-                        if (tack_angle > 20 && tack_angle < 90)
-		                    lgth_line = 200;
-                        else
-                            lgth_line = 0;
+                        tack_angle =  TWA_for_Max_Tack_VMG(Wind.TWS);
 
+                    if(Wind.RWA > 90 && Wind.RWA < 270)
+                       tack_angle =  TWA_for_Max_Run_VMG(Wind.TWS);
+
+		                lgth_line = 200;
                         GLubyte red(0), green(255), blue(0), alpha(255);
-                        glTranslated( boat_center.x, boat_center.y, 0);		                glColor4ub(0, 255, 0, 255);	// red, green, blue,  alpha
+                        glTranslated( boat_center.x, boat_center.y, 0);
+                        glColor4ub(0, 255, 0, 255);                 	// red, green, blue,  alpha
 		                Draw_Line(Wind.TWD + tack_angle, lgth_line);  // angle, lgth_line
 		                Draw_Line(Wind.TWD - tack_angle, lgth_line);  // angle, lgth_line
-                    }
                
-		        if(mark_lat > 0.0)
+		            if(mark_lat > 0.0)
                     {
                         glPopMatrix();
                         glPushMatrix();
@@ -678,12 +664,11 @@ bool tackandlay_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp)
                 Draw_Boat(dial_center);
                 Draw_Wind_Ptr(dial_center, 100, Wind.TWA, Wind.TWS);
 
-                if(lgth_line > 0) {
-                    glTranslated( dial_center.x, dial_center.y, 0);
-                    glColor4ub(255, 0, 0, 255);
-                    Draw_Line(tack_angle, 100);
-                    Draw_Line(-tack_angle, 100);
-                }
+                glTranslated( dial_center.x, dial_center.y, 0);
+                glColor4ub(255, 0, 0, 255);
+                Draw_Line(tack_angle, 100);
+                Draw_Line(-tack_angle, 100);
+
                 glPopMatrix();
                 glPopAttrib();
            }
@@ -691,71 +676,155 @@ bool tackandlay_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp)
 	  return true;
 }
 
-double tackandlay_pi::Calc_VMG( double TWA,  double SOG)
+double tackandlay_pi::Calc_VMG_W( double TWA,  double SOG)
 {
     double speed = abs( SOG * cos(deg2rad(TWA)));
     return speed;
 }
 
-double tackandlay_pi::Calc_VMC(double COG, double SOG, double BTM)
+double tackandlay_pi::Calc_VMG_C(double COG, double SOG, double BTM)
 {
     double speed = SOG * cos(deg2rad(COG-BTM));
     return speed;
 }
 
-double tackandlay_pi::Polar_SOG (double TWS, double TWA)
+double tackandlay_pi::Polar_boat_speed (double TWS, double TWA)
 {
-    double SOG = 0, SOG2 = 0;
-    int j_wdir = int((TWA - initial_Dir)/Wind_Dir_increment);
-    int i_wspd = int(TWS/Wind_Speed_increment);
-    for (j_wdir; j_wdir = 0; j_wdir--)
+    double first_boat_speed, second_boat_speed;
+    int first_TWA, second_TWA, first_wdir, first_wspd;
+   
+    for (j_wdir = 0; j_wdir < 60 ; j_wdir++)
     {
-        SOG = Master_pol[i_wspd].wdirMax[j_wdir]; // look for non-zero
-        if (SOG > 0) i_wspd = 0;
+        if ( Master_pol[0].TWA[j_wdir] < TWA){  // bracket TWA
+            first_TWA = Master_pol[0].TWA[j_wdir];
+            first_wdir = j_wdir;
+        }
+        else {
+            second_TWA = Master_pol[0].TWA[j_wdir];
+            j_wdir = 60;
+        }
     }
 
-    SOG2 = Master_pol[i_wspd + 1].wdirMax[j_wdir + 1]; // next data point value
-    if (SOG2 > 0)
+    for (i_wspd = 0; i_wspd < 15 ; i_wspd++) // get next lower TWS
     {
-        SOG += (SOG2-SOG) *( (TWA -(j_wdir*Wind_Dir_increment + initial_Dir))/5); // pro-rate delta
+        if(Master_pol[i_wspd].TWS < TWS)
+            first_wspd = i_wspd;
+
+        else 
+            i_wspd = 15;
     }
-    return SOG;
+
+    first_boat_speed = Master_pol[first_wspd].boat_speed[first_wdir];
+    second_boat_speed = Master_pol[first_wspd + 1].boat_speed[first_wdir + 1];
+
+    first_boat_speed = first_boat_speed + (second_boat_speed - first_boat_speed) *
+        (TWA - first_TWA)/(second_TWA - first_TWA);
+    return first_boat_speed;
 }
 
-double tackandlay_pi::Max_VMG_TWA(double TWS, double TWA)
+double tackandlay_pi::TWA_for_Max_VMG_to_Mark(double TWS, double TWD, double BTM)
 {
     double pol_speed, max_speed = 0;
-    double pol_TWA, max_TWA;
-    int j_wdir;
-    int i_wspd = (int)(TWS / Wind_Speed_increment);
-    if (TWA < 70 || TWA > 290)                  // Tacking
+    int pol_TWA, max_TWA;
+    int i_wspd;
+
+    for (int i = 0; i < 14; i++)            // Find current wind speed index
     {
-        for (j_wdir = 0; j_wdir < (90 / Wind_Speed_increment); j_wdir++) // 25->90 deg TWA
+        if (Master_pol[i].TWS < TWS)
+            i_wspd = i + 1;
+    }
+
+    double Course_WA = TWD - BTM;                 // determine if upwind or downwind to mark
+
+    if (Course_WA < 30){
+
+    };
+        
+    if (Course_WA < 90) // Tacking - approach from 0           
+    {
+        for (int j_wdir = 0; j_wdir < 30 ; j_wdir++)  // 0-90 deg TWA
+        
         {
-            pol_speed = Master_pol[i_wspd].wdirMax[j_wdir];
-            pol_TWA = j_wdir * Wind_Dir_increment + initial_Dir;
-            double VMG_speed = Calc_VMG(pol_TWA, pol_speed);      //VMG to wind
-            if (VMG_speed > max_speed)
+            pol_speed = Master_pol[i_wspd].boat_speed[j_wdir];
+            pol_TWA = Master_pol[i_wspd].TWA[j_wdir];
+
+            double VMG = Calc_VMG_W(pol_TWA, pol_speed);             //VMG_C to wind
+            if (VMG > max_speed)
             {
-                max_speed = VMG_speed;
+                max_speed = VMG;
                 max_TWA = pol_TWA;
             }
         }
     }
-    else if(TWA > 120 && TWA < 240)            // Running
+    else if(Course_WA > 90)            // Running - approach from 180
     {
-        for (j_wdir = Max_dir_pol_index; j_wdir < (90 / Wind_Speed_increment); j_wdir--) // 180 -> 90 deg TWA
+        for (j_wdir = 59; j_wdir = 30; j_wdir--) // 180 -> 90 deg TWA
         {
-            pol_speed = Master_pol[i_wspd].wdirMax[j_wdir];
-            pol_TWA = j_wdir * Wind_Dir_increment + initial_Dir;
-            double VMG_speed = Calc_VMG(pol_TWA, pol_speed);             //VMG to wind
-            if (VMG_speed > max_speed)
+            pol_speed = Master_pol[i_wspd].boat_speed[j_wdir];
+            pol_TWA = Master_pol[i_wspd].TWA[j_wdir];
+
+            double VMG = Calc_VMG_W(pol_TWA, pol_speed);             //VMG_C to wind
+            if (VMG > max_speed)
             {
-                max_speed = VMG_speed;
+                max_speed = VMG;
                 max_TWA = pol_TWA;
             }
         }
     }
+    return max_TWA;
+}
+
+double tackandlay_pi::TWA_for_Max_Tack_VMG(double TWS)
+    {
+        double pol_speed, max_speed = 0;
+        int pol_TWA, max_TWA;
+        int i_wspd;
+
+        for (int i = 0; i < 14; i++)            // Find current wind speed index
+        {
+            if (Master_pol[i].TWS < TWS)
+                i_wspd = i;
+        }
+
+        for (int j_wdir = 0; j_wdir < 30 ; j_wdir++)  // 0-90 deg TWA      
+        {
+            pol_speed = Master_pol[i_wspd].boat_speed[j_wdir];
+            pol_TWA = Master_pol[0].TWA[j_wdir];
+
+            double VMG = Calc_VMG_W(pol_TWA, pol_speed);             //VMG_C to wind
+            if (VMG > max_speed)
+            {
+                max_speed = VMG;
+                max_TWA = pol_TWA;
+            }
+        }
+    return max_TWA;
+}
+
+double tackandlay_pi::TWA_for_Max_Run_VMG(double TWS)
+    {
+        double pol_speed, max_speed = 0;
+        int pol_TWA, max_TWA;
+        int i_wspd;
+
+        for (int i = 0; i < 14; i++)            // Find current wind speed index
+        {
+            if (Master_pol[i].TWS < TWS)
+                i_wspd = i;
+        }
+
+        for (j_wdir = 59; j_wdir = 30; j_wdir--) // 180 -> 90 deg TWA
+        {
+            pol_speed = Master_pol[i_wspd].boat_speed[j_wdir];
+            pol_TWA = Master_pol[0].TWA[j_wdir];
+
+            double VMG = Calc_VMG_W(pol_TWA, pol_speed);             //VMG_C to wind
+            if (VMG > max_speed)
+            {
+                max_speed = VMG;
+                max_TWA = pol_TWA;
+            }
+        }
     return max_TWA;
 }
 
@@ -902,6 +971,11 @@ TnLDisplayOptionsDialog::TnLDisplayOptionsDialog()
 	windColour[7] = wxTheColourDatabase->Find(_T("RED"));
 	windColour[8] = wxTheColourDatabase->Find(_T("VIOLET RED"));
 	windColour[9] = wxTheColourDatabase->Find(_T("VIOLET"));
+    windColour[10] = wxTheColourDatabase->Find(_T("WHITE"));
+    windColour[11] = wxTheColourDatabase->Find(_T("CORAL"));
+	windColour[12] = wxTheColourDatabase->Find(_T("CYAN"));
+	windColour[13] = wxTheColourDatabase->Find(_T("LIGHT BLUE"));
+	windColour[14] = wxTheColourDatabase->Find(_T("SALMON"));
 //	Init();
 }
 
@@ -1001,26 +1075,25 @@ void TnLDisplayOptionsDialog::Render_Polar()
 
 void TnLDisplayOptionsDialog::createSpeedBullets()
 {
-
 	int xt, yt, bullet_point_count;
 	wxPoint ptBullets[600];             // max of 10 X 60
 
 	wxColour Colour,brush;
 	wxPen init_pen = dc->GetPen();			// get actual Pen for restoring later
 
-    for(int i_wspd = 0; i_wspd < 10; i_wspd++)	 // go thru all wind speeds
+    for(int i_wspd = 0; i_wspd < 15; i_wspd++)	 // go thru all wind speeds
 	{
 		bullet_point_count = 0;
 		Colour = windColour[i_wspd];
         brush = windColour[i_wspd];
 
-		for(int j_wdir = 0; j_wdir < pProgram->Max_dir_pol_index; j_wdir++)          // min-> max (180 deg)
+		for(int j_wdir = 0; j_wdir < 60; j_wdir++)          // min-> max (180 deg)
 		{
-            double boat_speed = pProgram->Master_pol[i_wspd].wdirMax[j_wdir];
+            double boat_speed = pProgram->Master_pol[i_wspd].boat_speed[j_wdir];
 			if( boat_speed > 0) 
                 {
 			        double speed_in_pixels = boat_speed * pixels_knot_ratio;
-                    double wind_angle = j_wdir * pProgram->Wind_Dir_increment + pProgram->initial_Dir;
+                    double wind_angle = pProgram->Master_pol[0].TWA[j_wdir];
 
 			        xt = wxRound(cos((wind_angle- 90)*PI/180)*speed_in_pixels + center.x);		// calculate the point for the bullet
 			        yt = wxRound(sin((wind_angle- 90)*PI/180)*speed_in_pixels + center.y);
@@ -1138,42 +1211,41 @@ double angle = atan2( (lat2-lat1)*PI/180, ((lon2-lon1)* PI/180 * cos(lat1 *PI/18
 	return (angle);
 }
 
-double TWS(double RWS, double RWA, double SOG)
+double fTWS(double RWS, double RWA, double SOG)
 {
-    RWA = deg2rad(RWA);
-    double TWS_value = sqrt(pow((RWS * sin(RWA)),2) + pow((RWS * cos(RWA)- SOG),2));
-    return TWS_value;
+    double RWA_R = RWA * PI/180.0;
+    double TWS = sqrt(pow((RWS * sin(RWA_R)),2) + pow((RWS * cos(RWA_R)- SOG),2));
+    return TWS;
 }
 
-double TWA(double RWS, double RWA, double SOG)
+double fTWA(double RWS, double RWA, double SOG)
 {
-    double RWA_R = deg2rad(RWA);
-    double TWA_value = atan((RWS * sin(RWA_R))/(RWS * cos(RWA_R)-SOG));
-    TWA_value = rad2deg(TWA_value);   
-    if(RWA > 180.0 && TWA_value < 180)
-        TWA_value = TWA_value + 180;       // atan only maps to 0->180 (pi/2 -> -pi/2)
-    if (TWA_value < 0)
-        TWA_value = TWA_value + 180;
-    return TWA_value;
+    double RWA_R = RWA*PI/180.0;
+    double TWA_R = atan((RWS * sin(RWA_R))/(RWS * cos(RWA_R)-SOG));
+    double TWA = TWA_R * 180.0/PI;
+    if (TWA < 0)
+        TWA = TWA + 180;
+    if(RWA > 180.0)
+        TWA = TWA + 180;       // atan only maps to 0->180 (pi/2 -> -pi/2)
+    return TWA;
 }
 
-double RWS(double TWS, double TWA, double SOG)
+double fRWS(double TWS, double TWA, double SOG)
 {
-    TWA = deg2rad(TWA);
+    TWA = TWA*PI/180.0;
     double RWS_value = sqrt(pow((TWS * sin(TWA)),2) + pow((TWS * cos(TWA)+ SOG), 2));
     return RWS_value;
 }
 
-double RWA(double TWS, double TWA,double SOG)
+double fRWA(double TWS, double TWA,double SOG)
 {
-    double TWA_R = deg2rad(TWA);
-    double RWA_value = atan((TWS * sin(TWA_R))/(TWS * cos(TWA_R)+ SOG));
-    RWA_value = rad2deg(RWA_value);
-    if( TWA > 180 && RWA_value < 180)
-        RWA_value = RWA_value + 180;               // atan only maps to 0->180 (pi/2 -> -pi/2)
-    if (RWA_value < 0)
-        RWA_value = RWA_value + 180;
-    return RWA_value;
+    double TWA_R = TWA = TWA*PI/180.0;
+    double RWA_R = atan((TWS * sin(TWA_R))/(TWS * cos(TWA_R)+ SOG));
+    double RWA = RWA_R *180.0 / PI;
+    if (RWA < 0)
+        RWA = RWA + 180;
+    if( TWA > 180 )
+        RWA = RWA + 180;               // atan only maps to 0->180 (pi/2 -> -pi/2)
+    return RWA;
 }
-
 

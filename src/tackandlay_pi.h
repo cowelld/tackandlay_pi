@@ -31,7 +31,7 @@
 #include "version.h"
 #include "wx/wx.h"
 #include <wx/glcanvas.h>
-#include "ocpndc.h"
+//#include "ocpndc.h"
 
 #ifndef  WX_PRECOMP
   #include "wx/wx.h"
@@ -92,12 +92,13 @@ public:
       void OnToolbarToolCallback(int id);
       void clear_Master_pol();
       void load_POL_file(wxString file_name);
-      bool find_POL_type(wxString str);
 
-      double Calc_VMG(double TWA, double SOG);
-      double Calc_VMC(double COG, double SOG, double BTM);
-      double Polar_SOG (double TWS, double TWA);
-      double Max_VMG_TWA(double TWS, double TWA);
+      double Calc_VMG_W(double TWA, double SOG);
+      double Calc_VMG_C(double COG, double SOG, double BTM);
+      double Polar_boat_speed (double TWS, double TWA);
+      double TWA_for_Max_VMG_to_Mark(double TWS, double TWA, double BTM);
+      double TWA_for_Max_Tack_VMG(double TWS);
+      double TWA_for_Max_Run_VMG(double TWS);
 
       void Draw_Line(int angle,int legnth);
       void Draw_Wind_Barb(wxPoint pp, double TWD, double speed);
@@ -112,21 +113,16 @@ public:
       bool SaveConfig(void);
 
       bool TnLactive;
-      struct pol
+      struct pol                // 15 wind speeds X 60 TWA's
 	    {
-		    double	wdir[60];
-		    double wdirMax[60];
-		    double wdirAve[60];
-		    double wdirTotal[60];
-		    int		count[60];
-        } Master_pol[10];
+            int TWS;
+		    int	TWA[60];
+		    double boat_speed[60];
+        } Master_pol[15];
+
       bool Master_pol_loaded;
 
-        wxString m_filename;
-        long Wind_Dir_increment;
-        long Wind_Speed_increment;
-        long Max_dir_pol_index;
-        long initial_Dir;
+      wxString m_filename;
 
 	TnLDisplayOptionsDialog     *m_pOptionsDialog;
 
@@ -186,7 +182,7 @@ class TnLDisplayOptionsDialog: public wxDialog
             wxWindow        *pParent;
             tackandlay_pi   *pProgram;
             
-            wxColour		windColour[10];
+            wxColour		windColour[15];
             wxBoxSizer      *bSizerNotebook;
             wxNotebook      *m_notebook;
             wxPanel         *m_panelPolar;
@@ -212,9 +208,9 @@ static double deg2rad(double deg);
 static double rad2deg(double rad);
 static double local_distance (double lat1, double lon1, double lat2, double lon2);
 static double local_bearing (double lat1, double lon1, double lat2, double lon2);
-double TWS(double RWS, double RWA, double SOG);
-double TWA(double RWS, double RWA, double SOG);
-double RWS(double TWS, double TWA, double SOG);
-double RWA(double TWS, double TWA,double SOG);
+double fTWS(double RWS, double RWA, double SOG);
+double fTWA(double RWS, double RWA, double SOG);
+double fRWS(double TWS, double TWA, double SOG);
+double fRWA(double TWS, double TWA,double SOG);
 
 #endif

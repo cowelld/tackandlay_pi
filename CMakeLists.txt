@@ -7,11 +7,11 @@
 # define minimum cmake version
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6.2)
 
-PROJECT(tackandlay_pi)
+PROJECT(TackandLay_pi)
 
-SET(PACKAGE_NAME tackandlay_pi)
-SET(VERBOSE_NAME TackAndLay)
-SET(TITLE_NAME TACKANDLAY)
+SET(PACKAGE_NAME TackandLay_pi)
+SET(VERBOSE_NAME TackandLay)
+SET(TITLE_NAME TackandLay)
 SET(CPACK_PACKAGE_CONTACT "Dave Cowell")
 
 SET(VERSION_MAJOR "0")
@@ -21,10 +21,12 @@ SET(CMAKE_BUILD_TYPE Debug)
 
 INCLUDE("cmake/PluginConfigure.cmake")
 
-SET(SRC_tackandlay
-            src/tackandlay_pi.h
-            src/tackandlay_pi.cpp
-)
+SET(SRC_TackandLay
+            src/TackandLay_pi.h
+            src/TackandLay_pi.cpp
+		 src/icons.h
+            src/icons.cpp
+		)
 
 SET(SRC_NMEA0183
     src/nmea0183/LatLong.hpp
@@ -93,7 +95,7 @@ SET(SRC_NMEA0183
 
 INCLUDE_DIRECTORIES(src/nmea0183)
 
-ADD_LIBRARY(${PACKAGE_NAME} SHARED ${SRC_tackandlay} ${SRC_NMEA0183})
+ADD_LIBRARY(${PACKAGE_NAME} SHARED ${SRC_TackandLay} ${SRC_NMEA0183})
 
 INCLUDE("cmake/PluginInstall.cmake")
 INCLUDE("cmake/PluginLocalization.cmake")

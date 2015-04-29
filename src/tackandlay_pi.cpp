@@ -664,13 +664,14 @@ bool tackandlay_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp)
             dial_center.x = 150;
             dial_center.y = 700;
 
-            glColor4ub(200, 0, 100, 255);
+            glColor4ub(0, 0, 0, 255);
             DrawCircle(dial_center,100,30);
+            glColor4ub(255, 0, 0, 255);
             Draw_Boat(dial_center);
             Draw_Wind_Ptr(dial_center, 100, Wind.TWA, Wind.TWS);
 
             glTranslated( dial_center.x, dial_center.y, 0);
-            glColor4ub(255, 0, 0, 255);
+            glColor4ub(0, 255, 0, 255);                 	// red, green, blue,  alpha
             Draw_Line(tack_angle, 100);
             Draw_Line(-tack_angle, 100);
 
@@ -683,13 +684,13 @@ bool tackandlay_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp)
 
 double tackandlay_pi::Calc_VMG_W( double TWA,  double SOG)
 {
-    double speed = fabs( SOG * cos(deg2rad(TWA)));
+    double speed =  SOG * cos(TWA * PI / 180);
     return speed;
 }
 
 double tackandlay_pi::Calc_VMG_C(double COG, double SOG, double BTM)
 {
-    double speed = SOG * cos(deg2rad(COG-BTM));
+    double speed = SOG * cos((COG-BTM)* PI/180);
     return speed;
 }
 
@@ -795,12 +796,14 @@ double tackandlay_pi::TWA_for_Max_Tack_VMG(double TWS)
             pol_speed = Master_pol[i_wspd].boat_speed[j_wdir];
             pol_TWA = Master_pol[0].TWA[j_wdir];
 
-            double VMG = Calc_VMG_W(pol_TWA, pol_speed);             //VMG_C to wind
-            if (VMG > max_speed)
-            {
-                max_speed = VMG;
-                max_TWA = pol_TWA;
-            }
+           if (pol_speed > 0){
+               double VMG = Calc_VMG_W(pol_TWA, pol_speed);             //VMG_C to wind
+                if (VMG > max_speed)
+                {
+                    max_speed = VMG;
+                    max_TWA = pol_TWA;
+                }
+           }
         }
     return max_TWA;
 }
@@ -822,11 +825,13 @@ double tackandlay_pi::TWA_for_Max_Run_VMG(double TWS)
             pol_speed = Master_pol[i_wspd].boat_speed[j_wdir];
             pol_TWA = Master_pol[0].TWA[j_wdir];
 
-            double VMG = Calc_VMG_W(pol_TWA, pol_speed);             //VMG_C to wind
-            if (VMG > max_speed)
-            {
-                max_speed = VMG;
-                max_TWA = pol_TWA;
+            if (pol_speed > 0) {
+                double VMG = Calc_VMG_W(pol_TWA, pol_speed);             //VMG_C to wind
+                if (VMG > max_speed)
+                {
+                    max_speed = VMG;
+                    max_TWA = pol_TWA;
+                }
             }
         }
     return max_TWA;

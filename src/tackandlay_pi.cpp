@@ -131,6 +131,7 @@ int tackandlay_pi::Init(void)
     m_pconfig = GetOCPNConfigObject();
     LoadConfig();
     Master_pol_loaded = false;
+    m_pOptionsDialog = NULL;
 
     m_parent_window = GetOCPNCanvasWindow();
     
@@ -269,11 +270,17 @@ void tackandlay_pi::OnToolbarToolCallback(int id)
            }
            delete m_pRoute;
         }
+
         wxString File_message = _("File currently loading is ") + m_filename;
         wxMessageBox(File_message);
 
-        if (!m_filename.IsEmpty() && TnLactive) 
+        if (!m_filename.IsEmpty() && TnLactive){
             load_POL_file(m_filename);
+            if(m_pOptionsDialog != NULL){
+                m_pOptionsDialog->Show();
+                m_pOptionsDialog->Refresh();
+            }
+        }
     }
 }
 
@@ -481,8 +488,6 @@ void tackandlay_pi::load_POL_file(wxString file_name)
     }
 }
 
-
-
 //***************** Cursor position data **********
  
 void tackandlay_pi::SetCursorLatLon(double lat, double lon)
@@ -508,7 +513,7 @@ void tackandlay_pi::OnContextMenuItemCallback(int id)
     m_pMark->m_CreateTime = wxDateTime::Now();
     m_pRoute->pWaypointList->Append(m_pMark);
 
-    if(!UpdatePlugInRoute(m_pRoute))
+//    if(!UpdatePlugInRoute(m_pRoute))
     {
         AddPlugInRoute(m_pRoute,false);
     }
@@ -535,7 +540,7 @@ void tackandlay_pi::SetPositionFixEx(PlugIn_Position_Fix_Ex &pfix)
       Boat.COG = pfix.Cog;
 
       Boat.HDG = pfix.Hdt;
-      if(Boat.HDG = 0)
+      if(Boat.HDG == 0)
         Boat.HDG = pfix.Cog;
 
 	  Boat.SOG = pfix.Sog;     
@@ -606,79 +611,79 @@ bool tackandlay_pi::RenderOverlay(wxDC &dc, PlugIn_ViewPort *vp)
 // Called by Plugin Manager on main system process cycle
 bool tackandlay_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp)
 {
-   tnl_shown_dc_message = 0;             // show message box if RenderOverlay() is called again
-		   wxPoint pp;
+    tnl_shown_dc_message = 0;             // show message box if RenderOverlay() is called again
+    wxPoint pp;
 
-	   if (TnLactive && Master_pol_loaded)
-       {
-           if(POS_OK && MWV_OK)
-	       {
-                glPushAttrib(GL_COLOR_BUFFER_BIT | GL_LINE_BIT | GL_HINT_BIT);      //Save state
-                glEnable(GL_BLEND);
-                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                glPushMatrix();
-  //             if (Wind.TWS > 2)
-               {
-                    GetCanvasPixLL(vp, &pp, boat_lat, boat_lon);
-		            boat_center = pp;
+	if (TnLactive && Master_pol_loaded)
+    {
+        if(POS_OK && MWV_OK)
+	    {
+            glPushAttrib(GL_COLOR_BUFFER_BIT | GL_LINE_BIT | GL_HINT_BIT);      //Save state
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glPushMatrix();
+            if (Wind.TWS > 2)
+            {
+                GetCanvasPixLL(vp, &pp, boat_lat, boat_lon);
+		        boat_center = pp;
 
-                    Wind.TWD = (Wind.TWA + Boat.COG);
-                    if (Wind.TWD > 360) Wind.TWD = Wind.TWD - 360;
-                    Draw_Wind_Barb(boat_center, Wind.TWD, Wind.TWS);
+                Wind.TWD = (Wind.TWA + Boat.COG);
+                if (Wind.TWD > 360) Wind.TWD = Wind.TWD - 360;
+                Draw_Wind_Barb(boat_center, Wind.TWD, Wind.TWS);
 
-		            if(Wind.RWA < 90 || Wind.RWA > 270) // Wind forward
-                        tack_angle =  TWA_for_Max_Tack_VMG(Wind.TWS);
+		        if(Wind.RWA < 90 || Wind.RWA > 270) // Wind forward
+                    tack_angle =  TWA_for_Max_Tack_VMG(Wind.TWS);
 
-                    if(Wind.RWA > 90 && Wind.RWA < 270)
-                       tack_angle =  TWA_for_Max_Run_VMG(Wind.TWS);
+                if(Wind.RWA > 90 && Wind.RWA < 270)
+                    tack_angle =  TWA_for_Max_Run_VMG(Wind.TWS);
 
-		                lgth_line = 200;
-                        GLubyte red(0), green(255), blue(0), alpha(255);
-                        glTranslated( boat_center.x, boat_center.y, 0);
-                        glColor4ub(0, 255, 0, 255);                 	// red, green, blue,  alpha
-		                Draw_Line(Wind.TWD + tack_angle, lgth_line);  // angle, lgth_line
-		                Draw_Line(Wind.TWD - tack_angle, lgth_line);  // angle, lgth_line
+		            lgth_line = 200;
+                    GLubyte red(0), green(255), blue(0), alpha(255);
+                    glTranslated( boat_center.x, boat_center.y, 0);
+                    glColor4ub(0, 255, 0, 255);                 	// red, green, blue,  alpha
+		            Draw_Line(Wind.TWD + tack_angle, lgth_line);  // angle, lgth_line
+		            Draw_Line(Wind.TWD - tack_angle, lgth_line);  // angle, lgth_line
                
-		            if(mark_lat > 0.0)
-                    {
-                        glPopMatrix();
-                        glPushMatrix();
-		                lay_angle = tack_angle;
-                        GetCanvasPixLL(vp, &mark_center, mark_lat, mark_lon);
-                        Draw_Wind_Barb(mark_center, Wind.TWD, Wind.TWS);
+		        if(mark_lat > 0.0)
+                {
+                    glPopMatrix();
+                    glPushMatrix();
+		            lay_angle = tack_angle;
+                    GetCanvasPixLL(vp, &mark_center, mark_lat, mark_lon);
+                    Draw_Wind_Barb(mark_center, Wind.TWD, Wind.TWS);
                         
-                        glTranslated( mark_center.x, mark_center.y, 0);
-                        glColor4ub(255, 0, 0, 255);
-                        Draw_Line(Wind.TWD + 180 + lay_angle, lgth_line);
-                        Draw_Line(Wind.TWD + 180 - lay_angle, lgth_line);
-                    }
-                }             
-                glPopMatrix();
-                glPushMatrix();
+                    glTranslated( mark_center.x, mark_center.y, 0);
+                    glColor4ub(255, 0, 0, 255);
+                    Draw_Line(Wind.TWD + 180 + lay_angle, lgth_line);
+                    Draw_Line(Wind.TWD + 180 - lay_angle, lgth_line);
+                }
+            }             
+            glPopMatrix();
+            glPushMatrix();
 
-                dial_center.x = 150;
-                dial_center.y = 700;
+            dial_center.x = 150;
+            dial_center.y = 700;
 
-                glColor4ub(200, 0, 100, 255);
-                DrawCircle(dial_center,100,30);
-                Draw_Boat(dial_center);
-                Draw_Wind_Ptr(dial_center, 100, Wind.TWA, Wind.TWS);
+            glColor4ub(200, 0, 100, 255);
+            DrawCircle(dial_center,100,30);
+            Draw_Boat(dial_center);
+            Draw_Wind_Ptr(dial_center, 100, Wind.TWA, Wind.TWS);
 
-                glTranslated( dial_center.x, dial_center.y, 0);
-                glColor4ub(255, 0, 0, 255);
-                Draw_Line(tack_angle, 100);
-                Draw_Line(-tack_angle, 100);
+            glTranslated( dial_center.x, dial_center.y, 0);
+            glColor4ub(255, 0, 0, 255);
+            Draw_Line(tack_angle, 100);
+            Draw_Line(-tack_angle, 100);
 
-                glPopMatrix();
-                glPopAttrib();
-           }
-       }
-	  return true;
+            glPopMatrix();
+            glPopAttrib();
+        }
+    }
+	return true;
 }
 
 double tackandlay_pi::Calc_VMG_W( double TWA,  double SOG)
 {
-    double speed = abs( SOG * cos(deg2rad(TWA)));
+    double speed = fabs( SOG * cos(deg2rad(TWA)));
     return speed;
 }
 
@@ -688,22 +693,20 @@ double tackandlay_pi::Calc_VMG_C(double COG, double SOG, double BTM)
     return speed;
 }
 
-double tackandlay_pi::Polar_boat_speed (double TWS, double TWA)
+double tackandlay_pi::interpret_Polar_boat_speed (double TWS, double TWA)
 {
     double first_boat_speed, second_boat_speed;
     int first_TWA, second_TWA, first_wdir, first_wspd;
    
     for (j_wdir = 0; j_wdir < 60 ; j_wdir++)
     {
-        if ( Master_pol[0].TWA[j_wdir] < TWA){  // bracket TWA
+        if ( Master_pol[0].TWA[j_wdir] < TWA){  // next lower TWA
             first_TWA = Master_pol[0].TWA[j_wdir];
             first_wdir = j_wdir;
         }
-        else {
-            second_TWA = Master_pol[0].TWA[j_wdir];
-            j_wdir = 60;
-        }
+        else j_wdir = 60;
     }
+    second_TWA = Master_pol[0].TWA[first_wdir + 1];
 
     for (i_wspd = 0; i_wspd < 15 ; i_wspd++) // get next lower TWS
     {
@@ -717,9 +720,10 @@ double tackandlay_pi::Polar_boat_speed (double TWS, double TWA)
     first_boat_speed = Master_pol[first_wspd].boat_speed[first_wdir];
     second_boat_speed = Master_pol[first_wspd + 1].boat_speed[first_wdir + 1];
 
-    first_boat_speed = first_boat_speed + (second_boat_speed - first_boat_speed) *
+    double int_boat_speed = first_boat_speed + (second_boat_speed - first_boat_speed) *
         (TWA - first_TWA)/(second_TWA - first_TWA);
-    return first_boat_speed;
+
+    return int_boat_speed;
 }
 
 double tackandlay_pi::TWA_for_Max_VMG_to_Mark(double TWS, double TWD, double BTM)
@@ -758,7 +762,7 @@ double tackandlay_pi::TWA_for_Max_VMG_to_Mark(double TWS, double TWD, double BTM
     }
     else if(Course_WA > 90)            // Running - approach from 180
     {
-        for (j_wdir = 59; j_wdir = 30; j_wdir--) // 180 -> 90 deg TWA
+        for (int j_wdir = 59; j_wdir = 30; j_wdir--) // 180 -> 90 deg TWA
         {
             pol_speed = Master_pol[i_wspd].boat_speed[j_wdir];
             pol_TWA = Master_pol[i_wspd].TWA[j_wdir];

@@ -95,7 +95,7 @@ public:
 
       double Calc_VMG_W(double TWA, double SOG);
       double Calc_VMG_C(double COG, double SOG, double BTM);
-      double Polar_boat_speed (double TWS, double TWA);
+      double interpret_Polar_boat_speed (double TWS, double TWA);
       double TWA_for_Max_VMG_to_Mark(double TWS, double TWA, double BTM);
       double TWA_for_Max_Tack_VMG(double TWS);
       double TWA_for_Max_Run_VMG(double TWS);

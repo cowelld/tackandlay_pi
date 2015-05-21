@@ -638,7 +638,7 @@ bool tackandlay_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp)
                     tack_angle =  TWA_for_Max_Run_VMG(Wind.TWS);
 
 		            lgth_line = 200;
-                    GLubyte red(0), green(255), blue(0), alpha(255);
+//                    GLubyte red(0), green(255), blue(0), alpha(255);
                     glTranslated( boat_center.x, boat_center.y, 0);
                     glColor4ub(0, 255, 0, 255);                 	// red, green, blue,  alpha
 		            Draw_Line(Wind.TWD + tack_angle, lgth_line);  // angle, lgth_line
@@ -763,7 +763,7 @@ double tackandlay_pi::TWA_for_Max_VMG_to_Mark(double TWS, double TWD, double BTM
     }
     else if(Course_WA > 90)            // Running - approach from 180
     {
-        for (int j_wdir = 59; j_wdir = 30; j_wdir--) // 180 -> 90 deg TWA
+        for (int j_wdir = 59; j_wdir >= 30; j_wdir--) // 180 -> 90 deg TWA
         {
             pol_speed = Master_pol[i_wspd].boat_speed[j_wdir];
             pol_TWA = Master_pol[i_wspd].TWA[j_wdir];
@@ -820,7 +820,7 @@ double tackandlay_pi::TWA_for_Max_Run_VMG(double TWS)
                 i_wspd = i;
         }
 
-        for (j_wdir = 59; j_wdir = 30; j_wdir--) // 180 -> 90 deg TWA
+        for (j_wdir = 59; j_wdir >= 30; j_wdir--) // 180 -> 90 deg TWA
         {
             pol_speed = Master_pol[i_wspd].boat_speed[j_wdir];
             pol_TWA = Master_pol[0].TWA[j_wdir];

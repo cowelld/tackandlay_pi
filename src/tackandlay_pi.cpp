@@ -631,16 +631,19 @@ bool tackandlay_pi::RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp)
                 if (Wind.TWD > 360) Wind.TWD = Wind.TWD - 360;
                 Draw_Wind_Barb(boat_center, Wind.TWD, Wind.TWS);
 
-		        if(Wind.RWA < 90 || Wind.RWA > 270) // Wind forward
+		        if(Wind.TWA < 90 || Wind.TWA > 270){ // Wind forward
                     tack_angle =  TWA_for_Max_Tack_VMG(Wind.TWS);
+                    glColor4ub(0, 255, 0, 255);
+		        }
 
-                if(Wind.RWA > 90 && Wind.RWA < 270)
+                if(Wind.TWA > 90 && Wind.TWA < 270){
                     tack_angle =  TWA_for_Max_Run_VMG(Wind.TWS);
-
+                    glColor4ub(0, 255, 255, 255);
+                }
 		            lgth_line = 200;
 //                    GLubyte red(0), green(255), blue(0), alpha(255);
                     glTranslated( boat_center.x, boat_center.y, 0);
-                    glColor4ub(0, 255, 0, 255);                 	// red, green, blue,  alpha
+//                    glColor4ub(0, 255, 0, 255);                 	// red, green, blue,  alpha
 		            Draw_Line(Wind.TWD + tack_angle, lgth_line);  // angle, lgth_line
 		            Draw_Line(Wind.TWD - tack_angle, lgth_line);  // angle, lgth_line
                
@@ -826,7 +829,7 @@ double tackandlay_pi::TWA_for_Max_Run_VMG(double TWS)
             pol_TWA = Master_pol[0].TWA[j_wdir];
 
             if (pol_speed > 0) {
-                double VMG = Calc_VMG_W(pol_TWA, pol_speed);             //VMG_C to wind
+                double VMG = -Calc_VMG_W(pol_TWA, pol_speed);             //VMG_C to wind
                 if (VMG > max_speed)
                 {
                     max_speed = VMG;
@@ -947,7 +950,7 @@ void tackandlay_pi::Draw_Wind_Ptr(wxPoint pp, float r, double angle, double spee
     double C3_alpha = deg2rad(angle);
     glColor4ub(0,255,0,255);
     glBegin(GL_TRIANGLES);    
-        glVertex2d(pp.x + (cos(C1_alpha)*(r+20)), pp.y - (sin(C1_alpha)*(r+20)));
+    	glVertex2d(pp.x + (cos(C1_alpha)*(r+20)), pp.y - (sin(C1_alpha)*(r+20)));
         glVertex2d(pp.x + (cos(C2_alpha)*(r+20)), pp.y - (sin(C2_alpha)*(r+20)));
         glVertex2d(pp.x + (cos(C3_alpha)*r), pp.y - (sin(C3_alpha)*r));
     glEnd();

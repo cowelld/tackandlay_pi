@@ -7,41 +7,39 @@
 # define minimum cmake version
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6.2)
 
-PROJECT(TackandLay_pi)
+PROJECT(tackandlay_pi)
 
-SET(PACKAGE_NAME TackandLay_pi)
-SET(VERBOSE_NAME TackandLay)
-SET(TITLE_NAME TackandLay)
+SET(PACKAGE_NAME tackandlay_pi)
+SET(VERBOSE_NAME tackandlay)
+SET(TITLE_NAME tackandlay)
 SET(CPACK_PACKAGE_CONTACT "Dave Cowell")
 
 SET(VERSION_MAJOR "0")
-SET(VERSION_MINOR "1")
-
-SET(CMAKE_BUILD_TYPE Debug)
+SET(VERSION_MINOR "2")
 
 INCLUDE("cmake/PluginConfigure.cmake")
 
 SET(SRC_TackandLay
-            src/TackandLay_pi.h
-            src/TackandLay_pi.cpp
+            src/tackandlay_pi.h
+            src/tackandlay_pi.cpp
 		 src/icons.h
             src/icons.cpp
 		)
 
 SET(SRC_NMEA0183
-    src/nmea0183/LatLong.hpp
+    src/nmea0183/latlong.hpp
     src/nmea0183/latlong.cpp
     src/nmea0183/long.cpp
     src/nmea0183/nmea0183.cpp
     src/nmea0183/nmea0183.hpp
-    src/nmea0183/Response.hpp
+    src/nmea0183/response.hpp
     src/nmea0183/response.cpp
-    src/nmea0183/RMB.hpp
+    src/nmea0183/rmb.hpp
     src/nmea0183/rmb.cpp
-    src/nmea0183/Sentence.hpp
+    src/nmea0183/sentence.hpp
     src/nmea0183/sentence.cpp
     src/nmea0183/talkerid.cpp
-    src/nmea0183/RMC.HPP
+    src/nmea0183/rmc.hpp
     src/nmea0183/rmc.cpp
     src/nmea0183/hexvalue.cpp
     src/nmea0183/lat.cpp
@@ -80,7 +78,7 @@ SET(SRC_NMEA0183
     src/nmea0183/zda.hpp
     src/nmea0183/rsa.hpp
     src/nmea0183/rsa.cpp
-    src/nmea0183/SatInfo.h
+    src/nmea0183/satinfo.h
     src/nmea0183/mwd.cpp
     src/nmea0183/mwd.hpp
     src/nmea0183/vwt.cpp

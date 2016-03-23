@@ -243,10 +243,12 @@ void tackandlay_pi::ShowPreferencesDialog(  wxWindow* parent )
     m_pOptionsDialog->Create(m_parent_window, this);
 
     wxString file_name = m_pOptionsDialog->Get_POL_File_name();
-    load_POL_file(file_name);
-    wxLogMessage(wxString::Format(_("    tackandlay_pi has loaded: %s"), file_name.c_str()));
-    m_pOptionsDialog->Show();
-    m_pOptionsDialog->Refresh();
+    if (file_name != "") {
+        load_POL_file(file_name);
+        wxLogMessage(wxString::Format(_("    tackandlay_pi has loaded: %s"), file_name.c_str()));
+        m_pOptionsDialog->Show();
+        m_pOptionsDialog->Refresh();
+    }
 }
 
 //******************************************************************************

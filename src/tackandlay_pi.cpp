@@ -287,7 +287,7 @@ void tackandlay_pi::OnToolbarToolCallback(int id)
 
         if (!m_filename.IsEmpty() && TnLactive) {
             load_POL_file(m_filename);
-            if(m_pOptionsDialog != NULL) {
+            if(m_pOptionsDialog != NULL && Master_pol_loaded == true) {
                 m_pOptionsDialog->Show();
                 m_pOptionsDialog->Refresh();
             }
@@ -974,8 +974,8 @@ bool TnLDisplayOptionsDialog::Create( wxWindow *parent, tackandlay_pi *ppi )
     bSizerNotebook->Add( m_notebook, 1, wxEXPAND | wxALL, 5 );
     topSizer->Add(bSizerNotebook);
 
-// Accept/Reject buttoen
-    wxStdDialogButtonSizer* DialogButtonSizer = wxDialog::CreateStdDialogButtonSizer(wxOK|wxCANCEL);
+// provide a button to close the Polar window
+    wxStdDialogButtonSizer* DialogButtonSizer = wxDialog::CreateStdDialogButtonSizer(wxCLOSE);
     topSizer->Add(DialogButtonSizer, 0, wxALIGN_RIGHT|wxALL, 5);
 
     this->Layout();
@@ -1119,8 +1119,8 @@ void TnLDisplayOptionsDialog::OnIdOKClick ( wxCommandEvent& event )
 
 wxString TnLDisplayOptionsDialog::Get_POL_File_name(void)
 {
-    wxString filetypext = _("*.pol");
-    wxFileDialog fdlg(this,_("Select a POL File (.pol)"),_T(""), _T(""), filetypext, wxFD_OPEN|wxFD_FILE_MUST_EXIST );
+    wxString filetypext = _("*.pol;*.csv");
+    wxFileDialog fdlg(this,_("Select a POL File (.pol;.cvs)"),_T(""), _T(""), filetypext, wxFD_OPEN|wxFD_FILE_MUST_EXIST );
     if(fdlg.ShowModal() == wxID_CANCEL) return _("");
 
     pProgram->m_filename = fdlg.GetPath();

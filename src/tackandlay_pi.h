@@ -31,7 +31,6 @@
 #include "version.h"
 #include "wx/wx.h"
 #include <wx/glcanvas.h>
-//For Windows Compile comment out "//#include "oopndc.h"" in line below
 #include "ocpndc.h"
 
 #ifndef  WX_PRECOMP

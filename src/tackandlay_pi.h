@@ -34,18 +34,21 @@
 //#include "ocpndc.h"
 
 #ifndef  WX_PRECOMP
-  #include "wx/wx.h"
+#include "wx/wx.h"
 #endif //precompiled headers
 
 #define     MY_API_VERSION_MAJOR    1
 #define     MY_API_VERSION_MINOR    11
 
+/*  PLUGIN_VERSION are both defined in CMakeLists.txt
 #define     PLUGIN_VERSION_MAJOR    0
-#define     PLUGIN_VERSION_MINOR    1
+#define     PLUGIN_VERSION_MINOR    1 */
 
 #ifndef PI
-      #define PI        3.1415926535897931160E0      /* pi */
+#define PI        3.1415926535897931160E0      /* pi */
 #endif
+#define     MAX_WINDANGLE           60              //row
+#define     MAX_WINDSPEED           15              //colums
 
 //    Forward definitions
 
@@ -60,71 +63,71 @@ class TnLDisplayOptionsDialog;
 class tackandlay_pi : public opencpn_plugin_111, wxTimer
 {
 public:
-      tackandlay_pi(void *ppimgr);
-      ~tackandlay_pi(void);
+    tackandlay_pi(void *ppimgr);
+    ~tackandlay_pi(void);
 
 //    The required PlugIn Methods
-      int Init(void);
-      bool DeInit(void);
+    int Init(void);
+    bool DeInit(void);
 
-      int GetAPIVersionMajor();
-      int GetAPIVersionMinor();
-      int GetPlugInVersionMajor();
-      int GetPlugInVersionMinor();
+    int GetAPIVersionMajor();
+    int GetAPIVersionMinor();
+    int GetPlugInVersionMajor();
+    int GetPlugInVersionMinor();
 
-      wxBitmap *GetPlugInBitmap();
-      wxString GetCommonName();
-      wxString GetShortDescription();
-      wxString GetLongDescription();
-	  void ShowPreferencesDialog( wxWindow* parent );
+    wxBitmap *GetPlugInBitmap();
+    wxString GetCommonName();
+    wxString GetShortDescription();
+    wxString GetLongDescription();
+    void ShowPreferencesDialog( wxWindow* parent );
 
 //    To override PlugIn Methods
-      void Notify();
-      void SetCursorLatLon(double lat, double lon);
-      void OnContextMenuItemCallback(int id);
+    void Notify();
+    void SetCursorLatLon(double lat, double lon);
+    void OnContextMenuItemCallback(int id);
 
-      void SetPositionFix(PlugIn_Position_Fix &pfix);
-      void SetPositionFixEx(PlugIn_Position_Fix_Ex &pfix);
-      void SetNMEASentence( wxString &sentence );
+    void SetPositionFix(PlugIn_Position_Fix &pfix);
+    void SetPositionFixEx(PlugIn_Position_Fix_Ex &pfix);
+    void SetNMEASentence( wxString &sentence );
 
-      void SetDefaults(void);
-      int GetToolbarToolCount(void);
-      void OnToolbarToolCallback(int id);
-      void clear_Master_pol();
-      void load_POL_file(wxString file_name);
+    void SetDefaults(void);
+    int GetToolbarToolCount(void);
+    void OnToolbarToolCallback(int id);
+    void clear_Master_pol();
+    void load_POL_file(wxString file_name);
 
-      double Calc_VMG_W(double TWA, double SOG);
-      double Calc_VMG_C(double COG, double SOG, double BTM);
-      double interpret_Polar_boat_speed (double TWS, double TWA);
-      double TWA_for_Max_VMG_to_Mark(double TWS, double TWA, double BTM);
-      double TWA_for_Max_Tack_VMG(double TWS);
-      double TWA_for_Max_Run_VMG(double TWS);
+    double Calc_VMG_W(double TWA, double SOG);
+    double Calc_VMG_C(double COG, double SOG, double BTM);
+    double interpret_Polar_boat_speed (double TWS, double TWA);
+    double TWA_for_Max_VMG_to_Mark(double TWS, double TWA, double BTM);
+    double TWA_for_Max_Tack_VMG(double TWS);
+    double TWA_for_Max_Run_VMG(double TWS);
 
-      void Draw_Line(int angle,int legnth);
-      void Draw_Wind_Barb(wxPoint pp, double TWD, double speed);
-      void Draw_Boat(wxPoint pp);
-      void DrawCircle(wxPoint pp, float r, int num_segments);
-      void Draw_Wind_Ptr(wxPoint pp, float r, double angle, double speed);
-      bool RenderOverlay(wxDC &dc, PlugIn_ViewPort *vp);
+    void Draw_Line(int angle,int legnth);
+    void Draw_Wind_Barb(wxPoint pp, double TWD, double speed);
+    void Draw_Boat(wxPoint pp);
+    void DrawCircle(wxPoint pp, float r, int num_segments);
+    void Draw_Wind_Ptr(wxPoint pp, float r, double angle, double speed);
+    bool RenderOverlay(wxDC &dc, PlugIn_ViewPort *vp);
 
-      bool RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp);
+    bool RenderGLOverlay(wxGLContext *pcontext, PlugIn_ViewPort *vp);
 
-      bool LoadConfig(void);
-      bool SaveConfig(void);
+    bool LoadConfig(void);
+    bool SaveConfig(void);
+    bool SetCellValue(int i_TWA,int i_TWS, double boat_speed);
 
-      bool TnLactive;
-      struct pol                // 15 wind speeds X 60 TWA's
-	    {
-            int TWS;
-		    int	TWA[60];
-		    double boat_speed[60];
-        } Master_pol[15];
+    bool TnLactive;
+    struct pol {              // 15 wind speeds X 60 TWA's
+        int TWS;
+        int	TWA[MAX_WINDANGLE];
+        double boat_speed[MAX_WINDANGLE];
+    } Master_pol[MAX_WINDSPEED];
 
-      bool Master_pol_loaded;
+    bool Master_pol_loaded;
 
-      wxString m_filename;
+    wxString m_filename;
 
-	TnLDisplayOptionsDialog     *m_pOptionsDialog;
+    TnLDisplayOptionsDialog     *m_pOptionsDialog;
 
 private:
 //      void CacheSetToolbarToolBitmaps(int bm_id_normal, int bm_id_rollover);
@@ -155,59 +158,61 @@ private:
 
 class TnLDisplayOptionsDialog: public wxDialog
 {
-      DECLARE_CLASS( TnLDisplayOptionsDialog )
-      DECLARE_EVENT_TABLE()
+    DECLARE_CLASS( TnLDisplayOptionsDialog )
+    DECLARE_EVENT_TABLE()
 
-      public:
-            TnLDisplayOptionsDialog();
-            ~TnLDisplayOptionsDialog( );
+public:
+    TnLDisplayOptionsDialog();
+    ~TnLDisplayOptionsDialog( );
 
-            bool Create(  wxWindow *parent, tackandlay_pi *ppi);
-            void Notify();
+    bool Create(  wxWindow *parent, tackandlay_pi *ppi);
+    void Notify();
 
-            wxString Get_POL_File_name();
+    wxString Get_POL_File_name();
 
-            void Render_Polar();
-	        void createDiagram(wxDC& dc);
-            void OnPaintPolar( wxPaintEvent& event );
-		    void OnSizePolar( wxSizeEvent& event );
-            void OnSizePolarDlg( wxSizeEvent& event );
+    void Render_Polar();
+    void createDiagram(wxDC& dc);
+    void OnPaintPolar( wxPaintEvent& event );
+    void OnSizePolar( wxSizeEvent& event );
+    void OnSizePolarDlg( wxSizeEvent& event );
 
-	        void createSpeedBullets();
+    void createSpeedBullets();
 
-      private:
-            void OnClose(wxCloseEvent& event);
-            void OnIdOKClick( wxCommandEvent& event );
+private:
+    void OnClose(wxCloseEvent& event);
+    void OnIdOKClick( wxCommandEvent& event );
 
-            wxWindow        *pParent;
-            tackandlay_pi   *pProgram;
-            
-            wxColour		windColour[15];
-            wxBoxSizer      *bSizerNotebook;
-            wxNotebook      *m_notebook;
-            wxPanel         *m_panelPolar;
-            wxDC            *dc;
+    wxWindow        *pParent;
+    tackandlay_pi   *pProgram;
 
-            wxSize			max_dimension;
-            wxPoint         center;
-	        int				radius;
-	        double			image_pixel_height[24];                 // display height in pixels
-	        int             display_speed;
-            double			pixels_knot_ratio;
-            double          number;
-            int             i_wspd;
-            int             j_wdir;
-            
+    wxColour		windColour[15];
+    wxBoxSizer      *bSizerNotebook;
+    wxNotebook      *m_notebook;
+    wxPanel         *m_panelPolar;
+    wxDC            *dc;
 
-            // DisplayOptions
-	  wxTextCtrl        *pText_Tack_Angle_Polar;
+    wxSize			max_dimension;
+    wxPoint         center;
+    int				radius;
+    double			image_pixel_height[24];                 // display height in pixels
+    int             display_speed;
+    double			pixels_knot_ratio;
+    double          number;
+    int             i_wspd;
+    int             j_wdir;
+
+
+    // DisplayOptions
+    wxTextCtrl        *pText_Tack_Angle_Polar;
 };
 
 
 static double deg2rad(double deg);
+/* Code NOT used
 static double rad2deg(double rad);
 static double local_distance (double lat1, double lon1, double lat2, double lon2);
 static double local_bearing (double lat1, double lon1, double lat2, double lon2);
+ */
 double fTWS(double RWS, double RWA, double SOG);
 double fTWA(double RWS, double RWA, double SOG);
 double fRWS(double TWS, double TWA, double SOG);

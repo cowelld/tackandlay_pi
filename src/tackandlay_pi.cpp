@@ -975,7 +975,7 @@ bool TnLDisplayOptionsDialog::Create( wxWindow *parent, tackandlay_pi *ppi )
     topSizer->Add(bSizerNotebook);
 
 // provide a button to close the Polar window
-    wxStdDialogButtonSizer* DialogButtonSizer = wxDialog::CreateStdDialogButtonSizer(wxCLOSE);
+    wxStdDialogButtonSizer* DialogButtonSizer = wxDialog::CreateStdDialogButtonSizer(wxOK|wxCANCEL);
     topSizer->Add(DialogButtonSizer, 0, wxALIGN_RIGHT|wxALL, 5);
 
     this->Layout();

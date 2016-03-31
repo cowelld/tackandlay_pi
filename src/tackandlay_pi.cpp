@@ -277,20 +277,26 @@ void tackandlay_pi::OnToolbarToolCallback(int id)
         TnLactive = !TnLactive;
         if (m_pRoute) {
             if(!m_pRoute->pWaypointList->IsEmpty()) {
-                m_pRoute->pWaypointList->DeleteContents(true);
+                m_pRoute->pWaypointList->DeleteContents(true); // default destuctor does not delete content              
             }
             delete m_pRoute;
+            m_pRoute=NULL;                                     // delete does not set up the value back to NULL
         }
-
-        wxString File_message = _("File currently loading is ") + m_filename;
-        wxMessageBox(File_message);
-
-        if (!m_filename.IsEmpty() && TnLactive) {
+        
+        //need to deal when polar file listed in config files has been removed
+        wxFileName f_filename = m_filename;
+        if (f_filename.IsFileReadable() && TnLactive) {  
+            wxString File_message = _("File currently loading is ") + m_filename;
+            wxMessageBox(File_message);
             load_POL_file(m_filename);
             if(m_pOptionsDialog != NULL && Master_pol_loaded == true) {
                 m_pOptionsDialog->Show();
                 m_pOptionsDialog->Refresh();
             }
+        }
+        if (!Master_pol_loaded) {                 // no valid polar data have been read
+            wxString File_message = _("Please configure file in TnL Preferences");
+            wxMessageBox(File_message);
         }
     }
 }
@@ -323,7 +329,7 @@ bool tackandlay_pi::LoadConfig(void)
     wxFileConfig *pConf = m_pconfig;
 
     if(pConf) {
-        pConf->SetPath(wxT("/Plugins/TackandLay"));
+        pConf->SetPath(wxT("/PlugIns/tackandlay"));
         pConf->Read ( _T( "TnLTransparency" ),  &tnl_overlay_transparency, .50 );
         pConf->Read (_T("TnLPOLFILE"), &m_filename, _(""));
         return true;
@@ -337,7 +343,7 @@ bool tackandlay_pi::SaveConfig(void)
     wxFileConfig *pConf = m_pconfig;
 
     if(pConf) {
-        pConf->SetPath(wxT("/Plugins/TackandLay"));
+        pConf->SetPath(wxT("/PlugIns/tackandlay"));
         pConf->Write ( _T( "TnLTransparency" ),  tnl_overlay_transparency);
         pConf->Write (_T("TnLPOLFILE"), m_filename);
         return true;
@@ -488,13 +494,13 @@ void tackandlay_pi::OnContextMenuItemCallback(int id)
     }
 
     m_pRoute->pWaypointList->Clear();
-    PlugIn_Waypoint *m_pMark = new PlugIn_Waypoint(cur_lat,cur_lon,_T("triangle"),_T("TnL Mark"),_T("TNL"));
+    PlugIn_Waypoint *m_pMark = new PlugIn_Waypoint(cur_lat,cur_lon,_T("diamond"),_T("TnL Mark"),_T("TNL"));
     mark_lat = cur_lat;
     mark_lon = cur_lon;
     m_pMark->m_CreateTime = wxDateTime::Now();
     m_pRoute->pWaypointList->Append(m_pMark);
 
-//    if(!UpdatePlugInRoute(m_pRoute))
+    if(!UpdatePlugInRoute(m_pRoute))   //avoid to create multiple route
     {
         AddPlugInRoute(m_pRoute,false);
     }

@@ -42,7 +42,7 @@
 */
 
 // Required for struct SAT_INFO
-#include "SatInfo.h"
+#include "satinfo.h"
 
 class GSV : public RESPONSE
 {
